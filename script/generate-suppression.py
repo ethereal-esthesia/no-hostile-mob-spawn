@@ -11,6 +11,7 @@ SUPPRESSION_RELATIVE_PATH = Path("Server/NPC/Spawn/Suppression/No_Hostile_Mob_Sp
 HOSTILE_GROUP_NAME = "NoHostileMobSpawn_Hostiles"
 HOSTILE_GROUP_RELATIVE_PATH = Path(f"Server/NPC/Groups/{HOSTILE_GROUP_NAME}.json")
 MOB_DROPS_CSV_RELATIVE_PATH = Path("Reports/Mob_Drops.csv")
+MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH = Path("Reports/Mob_Only_Recipe_Items.csv")
 ALWAYS_SUPPRESS = ["Aggressive", HOSTILE_GROUP_NAME]
 IGNORED_GROUPS = {
     "",
@@ -39,6 +40,7 @@ def load_json_assets(assets_zip):
     roles = {}
     groups = {}
     drops = {}
+    recipes = {}
 
     with zipfile.ZipFile(assets_zip) as archive:
         for info in archive.infolist():
@@ -57,8 +59,10 @@ def load_json_assets(assets_zip):
                 groups.setdefault(path.stem, []).append((path, document))
             elif path.parts[:2] == ("Server", "Drops"):
                 drops[path] = document
+            elif path.parts[:3] == ("Server", "Item", "Recipes"):
+                recipes[path] = document
 
-    return roles, groups, drops
+    return roles, groups, drops, recipes
 
 
 def collect_parameters(roles, role_name, seen=None):
@@ -283,6 +287,103 @@ def write_mob_drops_csv(roles, drops, hostile_roles, path):
     )
 
 
+def recipe_input_items(recipes):
+    item_recipes = {}
+    for path, recipe in recipes.items():
+        for item in recipe.get("Input", []):
+            if not isinstance(item, dict):
+                continue
+
+            item_id = item.get("ItemId")
+            if not item_id:
+                continue
+
+            item_recipes.setdefault(item_id, set()).add(path.stem)
+
+    return item_recipes
+
+
+def dropped_items_by_source(drops):
+    non_mob_items = set()
+
+    for path, document in drops.items():
+        if path.parts[:3] == ("Server", "Drops", "NPCs"):
+            continue
+
+        for row in iter_drop_item_rows(path.stem, path, document):
+            non_mob_items.add(row["item_id"])
+
+    return non_mob_items
+
+
+def write_mob_only_recipe_items_csv(roles, drops, hostile_roles, recipes, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+
+    item_recipes = recipe_input_items(recipes)
+    mob_drop_rows = list(iter_mob_drop_rows(roles, drops, hostile_roles))
+    role_sources_by_item = {}
+    status_by_item = {}
+    for row in mob_drop_rows:
+        item_id = row["item_id"]
+        role_sources_by_item.setdefault(item_id, set()).add(row["role_name"])
+        status_by_item.setdefault(item_id, set()).add(row["mob_status"])
+
+    role_linked_mob_items = set(role_sources_by_item)
+    non_mob_items = dropped_items_by_source(drops)
+    blocked_item_ids = sorted(
+        item_id
+        for item_id in item_recipes
+        if item_id in role_linked_mob_items and item_id not in non_mob_items
+    )
+
+    fieldnames = [
+        "item_id",
+        "mob_status",
+        "suppressed_mob_count",
+        "preserved_mob_count",
+        "recipe_count",
+        "recipes",
+        "suppressed_mobs",
+        "preserved_mobs",
+    ]
+
+    rows = []
+    hostile_role_set = set(hostile_roles)
+    for item_id in blocked_item_ids:
+        roles_for_item = sorted(role_sources_by_item.get(item_id, set()))
+        suppressed_mobs = [role for role in roles_for_item if role in hostile_role_set]
+        preserved_mobs = [role for role in roles_for_item if role not in hostile_role_set]
+        statuses = status_by_item.get(item_id, set())
+        if statuses == {"suppressed"}:
+            status = "missing"
+        elif "preserved" in statuses:
+            status = "preserved"
+        else:
+            status = "unknown"
+
+        rows.append(
+            {
+                "item_id": item_id,
+                "mob_status": status,
+                "suppressed_mob_count": len(suppressed_mobs),
+                "preserved_mob_count": len(preserved_mobs),
+                "recipe_count": len(item_recipes[item_id]),
+                "recipes": ";".join(sorted(item_recipes[item_id])),
+                "suppressed_mobs": ";".join(suppressed_mobs),
+                "preserved_mobs": ";".join(preserved_mobs),
+            }
+        )
+
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    missing_count = sum(1 for row in rows if row["mob_status"] == "missing")
+    preserved_count = sum(1 for row in rows if row["mob_status"] == "preserved")
+    return len(rows), missing_count, preserved_count
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: generate-suppression.py ASSETS_ZIP PACKAGE_DEST", file=sys.stderr)
@@ -294,11 +395,12 @@ def main():
         print(f"Error: Assets.zip not found: {assets_zip}", file=sys.stderr)
         return 1
 
-    roles, groups, drops = load_json_assets(assets_zip)
+    roles, groups, drops, recipes = load_json_assets(assets_zip)
     hostile_roles = generated_hostile_roles(roles, groups)
     hostile_group_path = package_dest / HOSTILE_GROUP_RELATIVE_PATH
     suppression_path = package_dest / SUPPRESSION_RELATIVE_PATH
     mob_drops_csv_path = package_dest / MOB_DROPS_CSV_RELATIVE_PATH
+    mob_only_recipe_items_csv_path = package_dest / MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH
     hostile_group_path.parent.mkdir(parents=True, exist_ok=True)
     suppression_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -332,6 +434,18 @@ def main():
         f"Generated Hytale mob drop CSV: {MOB_DROPS_CSV_RELATIVE_PATH} "
         f"({drop_row_count} rows, {unique_drop_item_count} unique items, "
         f"{mob_count} mobs)"
+    )
+    item_count, missing_item_count, preserved_item_count = write_mob_only_recipe_items_csv(
+        roles,
+        drops,
+        hostile_roles,
+        recipes,
+        mob_only_recipe_items_csv_path,
+    )
+    print(
+        f"Generated mob-only recipe item CSV: {MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH} "
+        f"({item_count} items, {missing_item_count} missing, "
+        f"{preserved_item_count} preserved)"
     )
     return 0
 

@@ -31,6 +31,7 @@ package_dest="$work_dir/NoHostileMobSpawn"
 hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"
 suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"
 mob_drops_csv="$package_dest/Reports/Mob_Drops.csv"
+mob_only_recipe_items_csv="$package_dest/Reports/Mob_Only_Recipe_Items.csv"
 
 if [ -n "$assets_zip" ] && [ -f "$assets_zip" ]; then
   "$MOD_SCRIPT_DIR/generate-suppression.py" "$assets_zip" "$package_dest" >/dev/null
@@ -39,6 +40,7 @@ else
   hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"
   suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"
   mob_drops_csv="$package_dest/Reports/Mob_Drops.csv"
+  mob_only_recipe_items_csv="$package_dest/Reports/Mob_Only_Recipe_Items.csv"
   echo "Assets.zip not found; validating checked-in package payload."
 fi
 
@@ -52,6 +54,10 @@ fi
 
 if [ ! -f "$mob_drops_csv" ]; then
   fail "generated mob drops CSV is missing: $mob_drops_csv"
+fi
+
+if [ ! -f "$mob_only_recipe_items_csv" ]; then
+  fail "generated mob-only recipe item CSV is missing: $mob_only_recipe_items_csv"
 fi
 
 count="$(python3 - "$hostile_group" <<'PY'
