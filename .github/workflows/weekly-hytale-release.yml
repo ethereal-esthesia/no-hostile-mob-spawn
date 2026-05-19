@@ -1,0 +1,81 @@
+name: Weekly Hytale Release
+
+on:
+  schedule:
+    - cron: '37 10 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-hytale-release
+  cancel-in-progress: false
+
+jobs:
+  release-if-hytale-changed:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Check latest CurseForge Hytale version
+        id: hytale
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+        run: ./script/update-to-latest-hytale.sh
+
+      - name: No Hytale release needed
+        if: steps.hytale.outputs.changed != 'true'
+        run: echo "Pinned Hytale version is already current; no release will be created."
+
+      - name: Build release artifact
+        if: steps.hytale.outputs.changed == 'true'
+        run: ./script/build-release.sh
+
+      - name: Refuse duplicate tag
+        if: steps.hytale.outputs.changed == 'true'
+        run: |
+          tag="v${{ steps.hytale.outputs.mod_version }}"
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            echo "Tag $tag already exists." >&2
+            exit 1
+          fi
+
+      - name: Commit Hytale pin update
+        if: steps.hytale.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod.properties package/package.json
+          git commit -m "Release ${{ steps.hytale.outputs.mod_version }} for Hytale ${{ steps.hytale.outputs.hytale_version }}"
+          git push origin main
+
+      - name: Create GitHub release
+        if: steps.hytale.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.hytale.outputs.mod_version }}
+          HYTALE_VERSION: ${{ steps.hytale.outputs.hytale_version }}
+        run: |
+          gh release create "v$VERSION" \
+            build/libs/NoHostileMobSpawn-"$VERSION"-hytale-"$HYTALE_VERSION".jar \
+            --target "$(git rev-parse HEAD)" \
+            --title "NoHostileMobSpawn $VERSION for Hytale $HYTALE_VERSION" \
+            --notes "Automated release for Hytale $HYTALE_VERSION. Smoke tests passed before publishing."
+
+      - name: Publish to CurseForge
+        if: steps.hytale.outputs.changed == 'true'
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: ./script/publish-curseforge.sh

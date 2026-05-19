@@ -60,3 +60,9 @@ jobs:
             --target "$GITHUB_SHA" \
             --title "NoHostileMobSpawn $VERSION for Hytale $HYTALE_VERSION" \
             --notes "Release $VERSION for Hytale $HYTALE_VERSION. Smoke tests passed before publishing."
+
+      - name: Publish to CurseForge
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: ./script/publish-curseforge.sh

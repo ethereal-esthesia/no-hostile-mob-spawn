@@ -52,7 +52,35 @@ build/libs/NoHostileMobSpawn-<modVersion>-hytale-<hytaleServerVersion>.jar
 The `Release` workflow mirrors the Minecraft plugin release shape: run it
 manually from `main`, type `release`, and it will smoke test, build the
 artifact, create tag `v<modVersion>`, and attach the jar-format package to a
-GitHub release.
+GitHub release. It also publishes that jar to CurseForge when
+`CURSEFORGE_API_TOKEN` and the `CURSEFORGE_PROJECT_ID` repository variable are
+configured.
+
+## Weekly Hytale Releases
+
+The `Weekly Hytale Release` workflow checks CurseForge's Hytale game-version
+list once per week. If CurseForge has a newer Hytale version than the pinned
+`hytaleServerVersion`, it:
+
+1. Updates `mod.properties`.
+2. Bumps the mod patch version.
+3. Runs the smoke/build release path.
+4. Commits the new pin.
+5. Creates a GitHub release.
+6. Publishes the release jar to CurseForge.
+
+The CurseForge project page is:
+
+```text
+https://legacy.curseforge.com/hytale/mods/elemental-harmony
+```
+
+Required GitHub configuration:
+
+```text
+Secret:   CURSEFORGE_API_TOKEN
+Variable: CURSEFORGE_PROJECT_ID
+```
 
 ## License
 
