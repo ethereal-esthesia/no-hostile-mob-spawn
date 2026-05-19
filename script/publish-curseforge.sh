@@ -65,7 +65,7 @@ status_code="$(
     -o "$response_file" \
     -w "%{http_code}" \
     -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
-    -F "metadata=@$metadata;type=application/json" \
+    -F "metadata=<$metadata;type=application/json" \
     -F "file=@$artifact" \
     "$CURSEFORGE_GAME_ENDPOINT/api/projects/$CURSEFORGE_PROJECT_ID/upload-file"
 )"
