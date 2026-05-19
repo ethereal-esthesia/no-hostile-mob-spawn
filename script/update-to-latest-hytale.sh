@@ -64,7 +64,10 @@ if target_name:
         if version_name(version).lower() == target_name.lower()
     ]
     if not matches:
-        raise SystemExit(f"CurseForge game version not found: {target_name}")
+        print("")
+        print(current_hytale_version)
+        print(target_name)
+        raise SystemExit(0)
     latest = matches[0]
     print(latest["id"])
     print(current_hytale_version)

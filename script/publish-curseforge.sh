@@ -29,11 +29,6 @@ if [ -z "$CURSEFORGE_PROJECT_ID" ]; then
   exit 1
 fi
 
-if [ -z "$hytale_game_version_id" ] && [ -z "$hytale_game_version_name" ]; then
-  echo "hytaleGameVersionId or hytaleGameVersionName must be set in mod.properties." >&2
-  exit 1
-fi
-
 if [ ! -f "$artifact" ]; then
   echo "Release artifact is missing: $artifact" >&2
   exit 1
@@ -59,7 +54,7 @@ metadata = {
 if game_version_id:
     metadata["gameVersions"] = [int(game_version_id)]
 elif game_version_name:
-    metadata["gameVersions"] = [game_version_name]
+    pass
 Path(path).write_text(json.dumps(metadata, indent=2) + "\n")
 PY
 
