@@ -10,7 +10,7 @@ from pathlib import Path, PurePosixPath
 SUPPRESSION_RELATIVE_PATH = Path("Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json")
 HOSTILE_GROUP_NAME = "NoHostileMobSpawn_Hostiles"
 HOSTILE_GROUP_RELATIVE_PATH = Path(f"Server/NPC/Groups/{HOSTILE_GROUP_NAME}.json")
-DROPS_CSV_RELATIVE_PATH = Path("Reports/All_Drops.csv")
+MOB_DROPS_CSV_RELATIVE_PATH = Path("Reports/Mob_Drops.csv")
 ALWAYS_SUPPRESS = ["Aggressive", HOSTILE_GROUP_NAME]
 IGNORED_GROUPS = {
     "",
@@ -199,16 +199,8 @@ def generated_hostile_roles(roles, groups):
     return sorted(hostile_roles)
 
 
-def drop_category(path):
-    try:
-        category = path.parts[2]
-    except IndexError:
-        return ""
-    return "" if category.endswith(".json") else category
-
-
-def iter_drop_item_rows(drops):
-    def visit(path, drop_id, value, container_path, inherited_weight):
+def iter_drop_item_rows(drop_id, path, document):
+    def visit(value, container_path, inherited_weight):
         if isinstance(value, dict):
             container_type = value.get("Type", "")
             weight = value.get("Weight", inherited_weight)
@@ -218,7 +210,6 @@ def iter_drop_item_rows(drops):
                 yield {
                     "drop_id": drop_id,
                     "drop_path": str(path),
-                    "category": drop_category(path),
                     "container_path": container_path,
                     "container_type": container_type,
                     "weight": weight if weight is not None else "",
@@ -231,18 +222,46 @@ def iter_drop_item_rows(drops):
             if isinstance(containers, list):
                 for index, child in enumerate(containers):
                     child_path = f"{container_path}/Containers[{index}]"
-                    yield from visit(path, drop_id, child, child_path, weight)
+                    yield from visit(child, child_path, weight)
 
-    for path, document in sorted(drops.items(), key=lambda item: str(item[0])):
-        yield from visit(path, path.stem, document.get("Container", document), "Container", None)
+    yield from visit(document.get("Container", document), "Container", None)
 
 
-def write_drops_csv(drops, path):
+def iter_mob_drop_rows(roles, drops, hostile_roles):
+    drops_by_id = {path.stem: (path, document) for path, document in drops.items()}
+    hostile_role_set = set(hostile_roles)
+
+    for role_name in sorted(roles):
+        if role_name.startswith(("Template_", "Component_", "Test_")):
+            continue
+
+        role = resolve_role(roles, role_name)
+        drop_list = role.get("DropList")
+        if not isinstance(drop_list, str) or not drop_list:
+            continue
+
+        drop = drops_by_id.get(drop_list)
+        if not drop:
+            continue
+
+        drop_path, document = drop
+        status = "suppressed" if role_name in hostile_role_set else "preserved"
+        for row in iter_drop_item_rows(drop_list, drop_path, document):
+            row = {
+                "role_name": role_name,
+                "mob_status": status,
+                **row,
+            }
+            yield row
+
+
+def write_mob_drops_csv(roles, drops, hostile_roles, path):
     path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = [
+        "role_name",
+        "mob_status",
         "drop_id",
         "drop_path",
-        "category",
         "container_path",
         "container_type",
         "weight",
@@ -250,14 +269,18 @@ def write_drops_csv(drops, path):
         "quantity_min",
         "quantity_max",
     ]
-    rows = list(iter_drop_item_rows(drops))
+    rows = list(iter_mob_drop_rows(roles, drops, hostile_roles))
 
     with path.open("w", newline="") as f:
         writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         writer.writerows(rows)
 
-    return len(rows), len({row["item_id"] for row in rows})
+    return (
+        len(rows),
+        len({row["item_id"] for row in rows}),
+        len({row["role_name"] for row in rows}),
+    )
 
 
 def main():
@@ -275,7 +298,7 @@ def main():
     hostile_roles = generated_hostile_roles(roles, groups)
     hostile_group_path = package_dest / HOSTILE_GROUP_RELATIVE_PATH
     suppression_path = package_dest / SUPPRESSION_RELATIVE_PATH
-    drops_csv_path = package_dest / DROPS_CSV_RELATIVE_PATH
+    mob_drops_csv_path = package_dest / MOB_DROPS_CSV_RELATIVE_PATH
     hostile_group_path.parent.mkdir(parents=True, exist_ok=True)
     suppression_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -299,10 +322,16 @@ def main():
         f"Generated NoHostileMobSpawn hostile role group: "
         f"{HOSTILE_GROUP_NAME} ({len(hostile_roles)} roles)"
     )
-    drop_row_count, unique_drop_item_count = write_drops_csv(drops, drops_csv_path)
+    drop_row_count, unique_drop_item_count, mob_count = write_mob_drops_csv(
+        roles,
+        drops,
+        hostile_roles,
+        mob_drops_csv_path,
+    )
     print(
-        f"Generated Hytale drop CSV: {DROPS_CSV_RELATIVE_PATH} "
-        f"({drop_row_count} rows, {unique_drop_item_count} unique items)"
+        f"Generated Hytale mob drop CSV: {MOB_DROPS_CSV_RELATIVE_PATH} "
+        f"({drop_row_count} rows, {unique_drop_item_count} unique items, "
+        f"{mob_count} mobs)"
     )
     return 0
 
