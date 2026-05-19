@@ -28,6 +28,14 @@ jobs:
           distribution: temurin
           java-version: '25'
 
+      - name: Validate CurseForge configuration
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: |
+          test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
+          test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
+
       - name: Check latest CurseForge Hytale version
         id: hytale
         env:
