@@ -30,6 +30,7 @@ fi
 package_dest="$work_dir/NoHostileMobSpawn"
 hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"
 suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"
+drops_csv="$package_dest/Reports/All_Drops.csv"
 
 if [ -n "$assets_zip" ] && [ -f "$assets_zip" ]; then
   "$MOD_SCRIPT_DIR/generate-suppression.py" "$assets_zip" "$package_dest" >/dev/null
@@ -37,6 +38,7 @@ else
   package_dest="$MOD_DIR/package"
   hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"
   suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"
+  drops_csv="$package_dest/Reports/All_Drops.csv"
   echo "Assets.zip not found; validating checked-in package payload."
 fi
 
@@ -46,6 +48,10 @@ fi
 
 if [ ! -f "$suppression" ]; then
   fail "generated suppression config is missing: $suppression"
+fi
+
+if [ ! -f "$drops_csv" ]; then
+  fail "generated drops CSV is missing: $drops_csv"
 fi
 
 count="$(python3 - "$hostile_group" <<'PY'

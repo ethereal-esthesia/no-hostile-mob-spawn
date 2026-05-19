@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import csv
 import fnmatch
 import json
 import sys
@@ -9,6 +10,7 @@ from pathlib import Path, PurePosixPath
 SUPPRESSION_RELATIVE_PATH = Path("Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json")
 HOSTILE_GROUP_NAME = "NoHostileMobSpawn_Hostiles"
 HOSTILE_GROUP_RELATIVE_PATH = Path(f"Server/NPC/Groups/{HOSTILE_GROUP_NAME}.json")
+DROPS_CSV_RELATIVE_PATH = Path("Reports/All_Drops.csv")
 ALWAYS_SUPPRESS = ["Aggressive", HOSTILE_GROUP_NAME]
 IGNORED_GROUPS = {
     "",
@@ -36,6 +38,7 @@ def deep_merge(base, override):
 def load_json_assets(assets_zip):
     roles = {}
     groups = {}
+    drops = {}
 
     with zipfile.ZipFile(assets_zip) as archive:
         for info in archive.infolist():
@@ -52,8 +55,10 @@ def load_json_assets(assets_zip):
                 roles[path.stem] = document
             elif path.parts[:3] == ("Server", "NPC", "Groups"):
                 groups.setdefault(path.stem, []).append((path, document))
+            elif path.parts[:2] == ("Server", "Drops"):
+                drops[path] = document
 
-    return roles, groups
+    return roles, groups, drops
 
 
 def collect_parameters(roles, role_name, seen=None):
@@ -194,6 +199,67 @@ def generated_hostile_roles(roles, groups):
     return sorted(hostile_roles)
 
 
+def drop_category(path):
+    try:
+        category = path.parts[2]
+    except IndexError:
+        return ""
+    return "" if category.endswith(".json") else category
+
+
+def iter_drop_item_rows(drops):
+    def visit(path, drop_id, value, container_path, inherited_weight):
+        if isinstance(value, dict):
+            container_type = value.get("Type", "")
+            weight = value.get("Weight", inherited_weight)
+            item = value.get("Item")
+
+            if isinstance(item, dict) and item.get("ItemId"):
+                yield {
+                    "drop_id": drop_id,
+                    "drop_path": str(path),
+                    "category": drop_category(path),
+                    "container_path": container_path,
+                    "container_type": container_type,
+                    "weight": weight if weight is not None else "",
+                    "item_id": item.get("ItemId", ""),
+                    "quantity_min": item.get("QuantityMin", ""),
+                    "quantity_max": item.get("QuantityMax", ""),
+                }
+
+            containers = value.get("Containers", [])
+            if isinstance(containers, list):
+                for index, child in enumerate(containers):
+                    child_path = f"{container_path}/Containers[{index}]"
+                    yield from visit(path, drop_id, child, child_path, weight)
+
+    for path, document in sorted(drops.items(), key=lambda item: str(item[0])):
+        yield from visit(path, path.stem, document.get("Container", document), "Container", None)
+
+
+def write_drops_csv(drops, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "drop_id",
+        "drop_path",
+        "category",
+        "container_path",
+        "container_type",
+        "weight",
+        "item_id",
+        "quantity_min",
+        "quantity_max",
+    ]
+    rows = list(iter_drop_item_rows(drops))
+
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(rows)
+
+    return len(rows), len({row["item_id"] for row in rows})
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: generate-suppression.py ASSETS_ZIP PACKAGE_DEST", file=sys.stderr)
@@ -205,10 +271,11 @@ def main():
         print(f"Error: Assets.zip not found: {assets_zip}", file=sys.stderr)
         return 1
 
-    roles, groups = load_json_assets(assets_zip)
+    roles, groups, drops = load_json_assets(assets_zip)
     hostile_roles = generated_hostile_roles(roles, groups)
     hostile_group_path = package_dest / HOSTILE_GROUP_RELATIVE_PATH
     suppression_path = package_dest / SUPPRESSION_RELATIVE_PATH
+    drops_csv_path = package_dest / DROPS_CSV_RELATIVE_PATH
     hostile_group_path.parent.mkdir(parents=True, exist_ok=True)
     suppression_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -231,6 +298,11 @@ def main():
     print(
         f"Generated NoHostileMobSpawn hostile role group: "
         f"{HOSTILE_GROUP_NAME} ({len(hostile_roles)} roles)"
+    )
+    drop_row_count, unique_drop_item_count = write_drops_csv(drops, drops_csv_path)
+    print(
+        f"Generated Hytale drop CSV: {DROPS_CSV_RELATIVE_PATH} "
+        f"({drop_row_count} rows, {unique_drop_item_count} unique items)"
     )
     return 0
 
