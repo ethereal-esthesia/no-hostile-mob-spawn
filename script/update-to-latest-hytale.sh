@@ -16,6 +16,8 @@ fi
 current_mod_version="$(property "$PROPERTIES_FILE" modVersion)"
 current_hytale_version="$(property "$PROPERTIES_FILE" hytaleServerVersion)"
 current_game_version_id="$(property "$PROPERTIES_FILE" hytaleGameVersionId)"
+current_game_version_name="$(property "$PROPERTIES_FILE" hytaleGameVersionName)"
+target_game_version_name="${CURSEFORGE_GAME_VERSION_NAME:-$current_game_version_name}"
 versions_file="$MOD_DIR/build/curseforge-hytale-versions.json"
 latest_file="$MOD_DIR/build/latest-hytale-version.txt"
 
@@ -25,13 +27,15 @@ curl -fsSL \
   "$CURSEFORGE_GAME_ENDPOINT/api/game/versions" \
   > "$versions_file"
 
-python3 - "$versions_file" > "$latest_file" <<'PY'
+python3 - "$versions_file" "$target_game_version_name" "$current_hytale_version" > "$latest_file" <<'PY'
 import json
 import re
 import sys
 
 with open(sys.argv[1]) as f:
     versions = json.load(f)
+target_name = sys.argv[2]
+current_hytale_version = sys.argv[3]
 
 def version_name(version):
     return str(version.get("name") or version.get("slug") or "")
@@ -54,13 +58,29 @@ candidates = [
 if not candidates:
     raise SystemExit("No CurseForge Hytale game versions returned.")
 
+if target_name:
+    matches = [
+        version for version in candidates
+        if version_name(version).lower() == target_name.lower()
+    ]
+    if not matches:
+        raise SystemExit(f"CurseForge game version not found: {target_name}")
+    latest = matches[0]
+    print(latest["id"])
+    print(current_hytale_version)
+    print(version_name(latest))
+    raise SystemExit(0)
+
 latest = sorted(candidates, key=version_key, reverse=True)[0]
 print(latest["id"])
+print(version_name(latest))
 print(version_name(latest))
 PY
 
 latest_game_version_id="$(sed -n '1p' "$latest_file")"
 latest_hytale_version="$(sed -n '2p' "$latest_file")"
+latest_game_version_name="$(sed -n '3p' "$latest_file")"
+echo "Resolved CurseForge game version: $latest_game_version_name ($latest_game_version_id)"
 
 if [ "$current_hytale_version" = "$latest_hytale_version" ] \
   && [ "$current_game_version_id" = "$latest_game_version_id" ]; then
@@ -71,6 +91,22 @@ if [ "$current_hytale_version" = "$latest_hytale_version" ] \
       echo "mod_version=$current_mod_version"
       echo "hytale_version=$current_hytale_version"
       echo "game_version_id=$current_game_version_id"
+      echo "game_version_name=$latest_game_version_name"
+    } >> "$GITHUB_OUTPUT"
+  fi
+  exit 0
+fi
+
+if [ "$current_hytale_version" = "$latest_hytale_version" ]; then
+  echo "Hytale server pin is current: $current_hytale_version"
+  echo "CurseForge game version id differs: ${current_game_version_id:-unset} -> $latest_game_version_id"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    {
+      echo "changed=false"
+      echo "mod_version=$current_mod_version"
+      echo "hytale_version=$current_hytale_version"
+      echo "game_version_id=$latest_game_version_id"
+      echo "game_version_name=$latest_game_version_name"
     } >> "$GITHUB_OUTPUT"
   fi
   exit 0
@@ -78,7 +114,7 @@ fi
 
 next_mod_version="$(bump_patch_version "$current_mod_version")"
 
-python3 - "$PROPERTIES_FILE" "$next_mod_version" "$latest_hytale_version" "$latest_game_version_id" <<'PY'
+python3 - "$PROPERTIES_FILE" "$next_mod_version" "$latest_hytale_version" "$latest_game_version_id" "$latest_game_version_name" <<'PY'
 import sys
 from pathlib import Path
 
@@ -87,6 +123,7 @@ updates = {
     "modVersion": sys.argv[2],
     "hytaleServerVersion": sys.argv[3],
     "hytaleGameVersionId": sys.argv[4],
+    "hytaleGameVersionName": sys.argv[5],
 }
 
 lines = path.read_text().splitlines()
@@ -130,5 +167,6 @@ if [ -n "${GITHUB_OUTPUT:-}" ]; then
     echo "mod_version=$next_mod_version"
     echo "hytale_version=$latest_hytale_version"
     echo "game_version_id=$latest_game_version_id"
+    echo "game_version_name=$latest_game_version_name"
   } >> "$GITHUB_OUTPUT"
 fi
