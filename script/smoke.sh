@@ -30,6 +30,7 @@ fi
 package_dest="$work_dir/NoHostileMobSpawn"
 hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"
 suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"
+legacy_suppression="$package_dest/Server/NPC/Spawn/Suppression/Peaceful_No_Hostiles.json"
 mob_drops_csv="$package_dest/Reports/Mob_Drops.csv"
 mob_only_recipe_items_csv="$package_dest/Reports/Mob_Only_Recipe_Items.csv"
 
@@ -39,6 +40,7 @@ else
   package_dest="$MOD_DIR/package"
   hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"
   suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"
+  legacy_suppression="$package_dest/Server/NPC/Spawn/Suppression/Peaceful_No_Hostiles.json"
   mob_drops_csv="$package_dest/Reports/Mob_Drops.csv"
   mob_only_recipe_items_csv="$package_dest/Reports/Mob_Only_Recipe_Items.csv"
   echo "Assets.zip not found; validating checked-in package payload."
@@ -50,6 +52,10 @@ fi
 
 if [ ! -f "$suppression" ]; then
   fail "generated suppression config is missing: $suppression"
+fi
+
+if [ ! -f "$legacy_suppression" ]; then
+  fail "legacy suppression compatibility config is missing: $legacy_suppression"
 fi
 
 if [ ! -f "$mob_drops_csv" ]; then
@@ -75,18 +81,19 @@ if [ "$count" -lt "$MIN_HOSTILE_ROLE_COUNT" ]; then
   fail "hostile role group shrank to $count; expected at least $MIN_HOSTILE_ROLE_COUNT (95% of $BASELINE_HOSTILE_ROLE_COUNT)"
 fi
 
-python3 - "$suppression" <<'PY'
+python3 - "$suppression" "$legacy_suppression" <<'PY'
 import json
 import sys
 
-with open(sys.argv[1]) as f:
-    suppressed_groups = set(json.load(f).get("SuppressedGroups", []))
-
 required = {"Aggressive", "NoHostileMobSpawn_Hostiles"}
-missing = sorted(required - suppressed_groups)
-if missing:
-    print("missing required suppressed groups: " + ", ".join(missing), file=sys.stderr)
-    raise SystemExit(1)
+for path in sys.argv[1:]:
+    with open(path) as f:
+        suppressed_groups = set(json.load(f).get("SuppressedGroups", []))
+
+    missing = sorted(required - suppressed_groups)
+    if missing:
+        print(f"{path}: missing required suppressed groups: " + ", ".join(missing), file=sys.stderr)
+        raise SystemExit(1)
 PY
 
 echo "NoHostileMobSpawn smoke test passed: $count hostile roles (minimum $MIN_HOSTILE_ROLE_COUNT)."

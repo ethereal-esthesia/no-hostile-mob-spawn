@@ -8,6 +8,8 @@ wildlife available.
 - `package/` is the Hytale package payload copied into `Server/mods`.
 - `script/generate-suppression.py` scans the installed `Assets.zip`, generates
   the `NoHostileMobSpawn_Hostiles` NPC group, and writes the suppression config.
+  It also writes the legacy `Peaceful_No_Hostiles` suppression ID so worlds
+  previously run with the old package can load persisted spawn markers.
 - `script/smoke.sh` verifies the generated hostile group has not unexpectedly
   shrunk by more than 5% from the current baseline.
 - `script/build-release.sh` writes a jar-format release package named with the

@@ -7,7 +7,10 @@ import zipfile
 from pathlib import Path, PurePosixPath
 
 
-SUPPRESSION_RELATIVE_PATH = Path("Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json")
+SUPPRESSION_RELATIVE_PATHS = [
+    Path("Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"),
+    Path("Server/NPC/Spawn/Suppression/Peaceful_No_Hostiles.json"),
+]
 HOSTILE_GROUP_NAME = "NoHostileMobSpawn_Hostiles"
 HOSTILE_GROUP_RELATIVE_PATH = Path(f"Server/NPC/Groups/{HOSTILE_GROUP_NAME}.json")
 MOB_DROPS_CSV_RELATIVE_PATH = Path("Reports/Mob_Drops.csv")
@@ -398,27 +401,26 @@ def main():
     roles, groups, drops, recipes = load_json_assets(assets_zip)
     hostile_roles = generated_hostile_roles(roles, groups)
     hostile_group_path = package_dest / HOSTILE_GROUP_RELATIVE_PATH
-    suppression_path = package_dest / SUPPRESSION_RELATIVE_PATH
+    suppression_paths = [package_dest / path for path in SUPPRESSION_RELATIVE_PATHS]
     mob_drops_csv_path = package_dest / MOB_DROPS_CSV_RELATIVE_PATH
     mob_only_recipe_items_csv_path = package_dest / MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH
     hostile_group_path.parent.mkdir(parents=True, exist_ok=True)
-    suppression_path.parent.mkdir(parents=True, exist_ok=True)
+    for suppression_path in suppression_paths:
+        suppression_path.parent.mkdir(parents=True, exist_ok=True)
 
     with hostile_group_path.open("w") as f:
         json.dump({"IncludeRoles": hostile_roles}, f, indent=2)
         f.write("\n")
 
-    with suppression_path.open("w") as f:
-        json.dump(
-            {
-                "SuppressionRadius": 2000,
-                "SuppressedGroups": ALWAYS_SUPPRESS,
-                "SuppressSpawnMarkers": True,
-            },
-            f,
-            indent=2,
-        )
-        f.write("\n")
+    suppression_document = {
+        "SuppressionRadius": 2000,
+        "SuppressedGroups": ALWAYS_SUPPRESS,
+        "SuppressSpawnMarkers": True,
+    }
+    for suppression_path in suppression_paths:
+        with suppression_path.open("w") as f:
+            json.dump(suppression_document, f, indent=2)
+            f.write("\n")
 
     print(
         f"Generated NoHostileMobSpawn hostile role group: "

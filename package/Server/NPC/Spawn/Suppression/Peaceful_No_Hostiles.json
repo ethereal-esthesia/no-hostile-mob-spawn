@@ -1,0 +1,8 @@
+{
+  "SuppressionRadius": 2000,
+  "SuppressedGroups": [
+    "Aggressive",
+    "NoHostileMobSpawn_Hostiles"
+  ],
+  "SuppressSpawnMarkers": true
+}
