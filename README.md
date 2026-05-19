@@ -82,6 +82,10 @@ Secret:   CURSEFORGE_API_TOKEN
 Variable: CURSEFORGE_PROJECT_ID
 ```
 
+To retry the CurseForge upload for the current already-released version without
+creating another GitHub release, run the `Publish Current Version to CurseForge`
+workflow manually and type `publish`.
+
 ## License
 
 No Hostile Mob Spawn is released under the GNU General Public License version 3.

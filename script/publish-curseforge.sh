@@ -59,9 +59,25 @@ metadata = {
 Path(path).write_text(json.dumps(metadata, indent=2) + "\n")
 PY
 
-curl -fsSL \
-  -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
-  -F "metadata=@$metadata;type=application/json" \
-  -F "file=@$artifact" \
-  "$CURSEFORGE_GAME_ENDPOINT/api/projects/$CURSEFORGE_PROJECT_ID/upload-file"
+response_file="$MOD_DIR/build/curseforge-upload-response.json"
+status_code="$(
+  curl -sS \
+    -o "$response_file" \
+    -w "%{http_code}" \
+    -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+    -F "metadata=@$metadata;type=application/json" \
+    -F "file=@$artifact" \
+    "$CURSEFORGE_GAME_ENDPOINT/api/projects/$CURSEFORGE_PROJECT_ID/upload-file"
+)"
+
+cat "$response_file"
 echo
+
+case "$status_code" in
+  2??)
+    ;;
+  *)
+    echo "CurseForge upload failed with HTTP $status_code." >&2
+    exit 1
+    ;;
+esac
