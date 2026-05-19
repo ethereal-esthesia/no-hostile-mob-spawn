@@ -42,6 +42,7 @@ fi
 rm -rf "$STAGING_DIR"
 mkdir -p "$STAGING_DIR" "$LIBS_DIR"
 rsync -a \
+  --exclude '.DS_Store' \
   --exclude 'package.json' \
   --exclude 'manifest.json' \
   --exclude 'hytale-version.txt' \
