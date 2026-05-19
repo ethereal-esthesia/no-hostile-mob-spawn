@@ -13,6 +13,7 @@ source "$MOD_DIR/script/properties-lib.sh"
 mod_version="$(property "$PROPERTIES_FILE" modVersion)"
 hytale_version="$(property "$PROPERTIES_FILE" hytaleServerVersion)"
 hytale_game_version_id="$(property "$PROPERTIES_FILE" hytaleGameVersionId)"
+hytale_game_version_name="$(property "$PROPERTIES_FILE" hytaleGameVersionName)"
 artifact_base_name="$(property "$PROPERTIES_FILE" artifactBaseName)"
 project_slug="$(property "$PROPERTIES_FILE" curseForgeProjectSlug)"
 artifact="$MOD_DIR/build/libs/${artifact_base_name}-${mod_version}-hytale-${hytale_version}.jar"
@@ -28,8 +29,8 @@ if [ -z "$CURSEFORGE_PROJECT_ID" ]; then
   exit 1
 fi
 
-if [ -z "$hytale_game_version_id" ]; then
-  echo "hytaleGameVersionId is empty in mod.properties; run update-to-latest-hytale.sh first." >&2
+if [ -z "$hytale_game_version_id" ] && [ -z "$hytale_game_version_name" ]; then
+  echo "hytaleGameVersionId or hytaleGameVersionName must be set in mod.properties." >&2
   exit 1
 fi
 
@@ -40,12 +41,12 @@ fi
 
 metadata="$MOD_DIR/build/curseforge-upload-metadata.json"
 mkdir -p "$MOD_DIR/build"
-python3 - "$metadata" "$mod_version" "$hytale_version" "$hytale_game_version_id" "$artifact_base_name" "$project_slug" "$CURSEFORGE_RELEASE_TYPE" <<'PY'
+python3 - "$metadata" "$mod_version" "$hytale_version" "$hytale_game_version_id" "$hytale_game_version_name" "$artifact_base_name" "$project_slug" "$CURSEFORGE_RELEASE_TYPE" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path, mod_version, hytale_version, game_version_id, artifact_base_name, project_slug, release_type = sys.argv[1:]
+path, mod_version, hytale_version, game_version_id, game_version_name, artifact_base_name, project_slug, release_type = sys.argv[1:]
 metadata = {
     "changelog": (
         f"Release {mod_version} for Hytale {hytale_version}. "
@@ -53,9 +54,12 @@ metadata = {
     ),
     "changelogType": "markdown",
     "displayName": f"{artifact_base_name} {mod_version} for Hytale {hytale_version}",
-    "gameVersions": [int(game_version_id)],
     "releaseType": release_type,
 }
+if game_version_id:
+    metadata["gameVersions"] = [int(game_version_id)]
+elif game_version_name:
+    metadata["gameVersions"] = [game_version_name]
 Path(path).write_text(json.dumps(metadata, indent=2) + "\n")
 PY
 
