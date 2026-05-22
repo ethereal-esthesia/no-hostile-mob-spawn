@@ -1,0 +1,40 @@
+name: Update CurseForge File Metadata
+
+on:
+  workflow_dispatch:
+    inputs:
+      file_id:
+        description: CurseForge file ID to update.
+        required: true
+        type: string
+      confirm_update:
+        description: Type "update" to update the existing CurseForge file metadata.
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && inputs.confirm_update == 'update'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Validate CurseForge configuration
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: |
+          test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
+          test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
+
+      - name: Update CurseForge file metadata
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+          CURSEFORGE_FILE_ID: ${{ inputs.file_id }}
+        run: ./script/update-curseforge-file.sh
