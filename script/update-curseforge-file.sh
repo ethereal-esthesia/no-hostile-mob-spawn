@@ -73,7 +73,16 @@ if len(matches) != 1:
         f"Expected one CurseForge game version named {wanted_name!r}; found {len(matches)}.",
         file=sys.stderr,
     )
-    for version in matches[:20]:
+    candidates = [
+        version
+        for version in versions
+        if any(
+            fragment in str(version.get("name", "")).lower()
+            for fragment in ("early", "access", "hytale", "2.5", "2-5")
+        )
+    ]
+    print(f"Candidate game versions: {len(candidates)}", file=sys.stderr)
+    for version in candidates[:50]:
         print(version, file=sys.stderr)
     raise SystemExit(1)
 
