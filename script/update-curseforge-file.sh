@@ -7,13 +7,15 @@ CURSEFORGE_GAME_ENDPOINT="${CURSEFORGE_GAME_ENDPOINT:-https://www.curseforge.com
 CURSEFORGE_API_TOKEN="${CURSEFORGE_API_TOKEN:-}"
 CURSEFORGE_PROJECT_ID="${CURSEFORGE_PROJECT_ID:-}"
 CURSEFORGE_FILE_ID="${CURSEFORGE_FILE_ID:-}"
+CURSEFORGE_GAME_VERSION_ID="${CURSEFORGE_GAME_VERSION_ID:-}"
 CURSEFORGE_RELEASE_TYPE="${CURSEFORGE_RELEASE_TYPE:-release}"
 
 source "$MOD_DIR/script/properties-lib.sh"
 
 mod_version="$(property "$PROPERTIES_FILE" modVersion)"
 hytale_version="$(property "$PROPERTIES_FILE" hytaleServerVersion)"
-hytale_game_version_id="$(property "$PROPERTIES_FILE" hytaleGameVersionId)"
+hytale_game_version_id="${CURSEFORGE_GAME_VERSION_ID:-$(property "$PROPERTIES_FILE" hytaleGameVersionId)}"
+hytale_game_version_name="$(property "$PROPERTIES_FILE" hytaleGameVersionName)"
 artifact_base_name="$(property "$PROPERTIES_FILE" artifactBaseName)"
 
 if [ -z "$CURSEFORGE_API_TOKEN" ]; then
@@ -32,9 +34,55 @@ if [ -z "$CURSEFORGE_FILE_ID" ]; then
 fi
 
 if [ -z "$hytale_game_version_id" ]; then
-  echo "hytaleGameVersionId is empty in mod.properties." >&2
-  exit 1
+  if [ -z "$hytale_game_version_name" ]; then
+    echo "hytaleGameVersionId and hytaleGameVersionName are empty in mod.properties." >&2
+    exit 1
+  fi
+
+  versions_file="$MOD_DIR/build/curseforge-game-versions.json"
+  mkdir -p "$MOD_DIR/build"
+  status_code="$(
+    curl -sS \
+      -o "$versions_file" \
+      -w "%{http_code}" \
+      -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
+      "$CURSEFORGE_GAME_ENDPOINT/api/game/versions"
+  )"
+  case "$status_code" in
+    2??)
+      ;;
+    *)
+      cat "$versions_file"
+      echo
+      echo "CurseForge game version lookup failed with HTTP $status_code." >&2
+      exit 1
+      ;;
+  esac
+
+  hytale_game_version_id="$(python3 - "$versions_file" "$hytale_game_version_name" <<'PY'
+import json
+import sys
+
+path, wanted_name = sys.argv[1:]
+with open(path) as f:
+    versions = json.load(f)
+
+matches = [version for version in versions if version.get("name") == wanted_name]
+if len(matches) != 1:
+    print(
+        f"Expected one CurseForge game version named {wanted_name!r}; found {len(matches)}.",
+        file=sys.stderr,
+    )
+    for version in matches[:20]:
+        print(version, file=sys.stderr)
+    raise SystemExit(1)
+
+print(matches[0]["id"])
+PY
+)"
 fi
+
+echo "Using CurseForge game version ID $hytale_game_version_id for $hytale_game_version_name."
 
 metadata="$MOD_DIR/build/curseforge-update-metadata.json"
 mkdir -p "$MOD_DIR/build"

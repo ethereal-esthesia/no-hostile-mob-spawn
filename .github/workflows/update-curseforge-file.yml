@@ -11,6 +11,10 @@ on:
         description: Type "update" to update the existing CurseForge file metadata.
         required: true
         type: string
+      game_version_id:
+        description: Optional CurseForge game version ID override.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -37,4 +41,5 @@ jobs:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
           CURSEFORGE_FILE_ID: ${{ inputs.file_id }}
+          CURSEFORGE_GAME_VERSION_ID: ${{ inputs.game_version_id }}
         run: ./script/update-curseforge-file.sh
