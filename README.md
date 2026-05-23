@@ -61,6 +61,7 @@ The default spawn coordinate is `1062,80,283`; override it with
 Release metadata is pinned in `mod.properties`.
 
 ```bash
+./mods/NoHostileMobSpawn/script/set-release-version.sh --patch
 ./mods/NoHostileMobSpawn/script/build-release.sh
 ```
 
@@ -70,12 +71,15 @@ The release artifact is written to:
 build/libs/NoHostileMobSpawn-<modVersion>-hytale-<hytaleServerVersion>.jar
 ```
 
-The `Release` workflow mirrors the Minecraft plugin release shape: run it
-manually from `main`, type `release`, and it will smoke test, build the
-artifact, create tag `v<modVersion>`, and attach the jar-format package to a
-GitHub release. It also publishes that jar to CurseForge when
-`CURSEFORGE_API_TOKEN` and the `CURSEFORGE_PROJECT_ID` repository variable are
-configured.
+Use `set-release-version.sh` to intentionally change the code release version;
+commit and push that version change to `main` to publish. The publish workflow
+uses the commit where `modVersion` changed as the release target, so later
+non-version commits in the same push do not become the release artifact. The
+manual `Release` workflow remains available from `main` by typing `release`.
+Both paths smoke test, build the artifact, create tag `v<modVersion>`, attach
+the jar-format package to a GitHub release, and publish that jar to CurseForge
+when `CURSEFORGE_API_TOKEN` and the `CURSEFORGE_PROJECT_ID` repository variable
+are configured.
 
 ## Weekly Hytale Releases
 
@@ -89,6 +93,9 @@ list once per week. If CurseForge has a newer Hytale version than the pinned
 4. Commits the new pin.
 5. Creates a GitHub release.
 6. Publishes the release jar to CurseForge.
+
+Like the push publish workflow, the weekly workflow targets the commit where
+`modVersion` changed rather than whatever commit happens to be newest.
 
 The CurseForge project page is:
 

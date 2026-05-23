@@ -1,0 +1,95 @@
+name: Publish Version Change
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - mod.properties
+      - package/package.json
+
+permissions:
+  contents: write
+
+jobs:
+  publish-version-change:
+    runs-on: ubuntu-latest
+    if: github.actor != 'github-actions[bot]'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Find release version commit
+        id: release
+        run: ./script/latest-version-change.sh "${{ github.event.before }}" "${{ github.sha }}"
+
+      - name: No release version change
+        if: steps.release.outputs.changed != 'true'
+        run: echo "No modVersion change in this push; no release will be published."
+
+      - name: Check out release version commit
+        if: steps.release.outputs.changed == 'true'
+        run: git checkout --detach "${{ steps.release.outputs.commit }}"
+
+      - name: Set up Java
+        if: steps.release.outputs.changed == 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Validate CurseForge configuration
+        if: steps.release.outputs.changed == 'true'
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: |
+          test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
+          test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
+
+      - name: Read release version
+        if: steps.release.outputs.changed == 'true'
+        id: version
+        run: |
+          version="$(./script/project-version.sh)"
+          hytale_version="$(./script/hytale-version.sh)"
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "hytale_version=${hytale_version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Refuse duplicate tag
+        if: steps.release.outputs.changed == 'true'
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "Tag ${{ steps.version.outputs.tag }} already exists." >&2
+            exit 1
+          fi
+
+      - name: Build release artifact
+        if: steps.release.outputs.changed == 'true'
+        run: ./script/build-release.sh
+
+      - name: Create GitHub release
+        if: steps.release.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          HYTALE_VERSION: ${{ steps.version.outputs.hytale_version }}
+          RELEASE_COMMIT: ${{ steps.release.outputs.commit }}
+        run: |
+          gh release create "$TAG" \
+            build/libs/NoHostileMobSpawn-"$VERSION"-hytale-"$HYTALE_VERSION".jar \
+            --target "$RELEASE_COMMIT" \
+            --title "NoHostileMobSpawn $VERSION for Hytale $HYTALE_VERSION" \
+            --notes "Release $VERSION for Hytale $HYTALE_VERSION. Smoke tests passed before publishing."
+
+      - name: Publish to CurseForge
+        if: steps.release.outputs.changed == 'true'
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: ./script/publish-curseforge.sh
