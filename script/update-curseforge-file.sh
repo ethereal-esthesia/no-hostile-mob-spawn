@@ -34,64 +34,11 @@ if [ -z "$CURSEFORGE_FILE_ID" ]; then
 fi
 
 if [ -z "$hytale_game_version_id" ]; then
-  if [ -z "$hytale_game_version_name" ]; then
-    echo "hytaleGameVersionId and hytaleGameVersionName are empty in mod.properties." >&2
-    exit 1
-  fi
-
-  versions_file="$MOD_DIR/build/curseforge-game-versions.json"
-  mkdir -p "$MOD_DIR/build"
-  status_code="$(
-    curl -sS \
-      -o "$versions_file" \
-      -w "%{http_code}" \
-      -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
-      "$CURSEFORGE_GAME_ENDPOINT/api/game/versions"
-  )"
-  case "$status_code" in
-    2??)
-      ;;
-    *)
-      cat "$versions_file"
-      echo
-      echo "CurseForge game version lookup failed with HTTP $status_code." >&2
-      exit 1
-      ;;
-  esac
-
-  hytale_game_version_id="$(python3 - "$versions_file" "$hytale_game_version_name" <<'PY'
-import json
-import sys
-
-path, wanted_name = sys.argv[1:]
-with open(path) as f:
-    versions = json.load(f)
-
-matches = [version for version in versions if version.get("name") == wanted_name]
-if len(matches) != 1:
-    print(
-        f"Expected one CurseForge game version named {wanted_name!r}; found {len(matches)}.",
-        file=sys.stderr,
-    )
-    candidates = [
-        version
-        for version in versions
-        if any(
-            fragment in str(version.get("name", "")).lower()
-            for fragment in ("early", "access", "hytale", "2.5", "2-5")
-        )
-    ]
-    print(f"Candidate game versions: {len(candidates)}", file=sys.stderr)
-    for version in candidates[:50]:
-        print(version, file=sys.stderr)
-    raise SystemExit(1)
-
-print(matches[0]["id"])
-PY
-)"
+  echo "hytaleGameVersionId is empty in mod.properties; CurseForge file updates require the numeric Hytale game version ID." >&2
+  exit 1
 fi
 
-echo "Using CurseForge game version ID $hytale_game_version_id for $hytale_game_version_name."
+echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game_version_name:-Hytale $hytale_version}."
 
 metadata="$MOD_DIR/build/curseforge-update-metadata.json"
 mkdir -p "$MOD_DIR/build"
@@ -114,6 +61,9 @@ metadata = {
 }
 Path(path).write_text(json.dumps(metadata, indent=2) + "\n")
 PY
+
+echo "CurseForge update metadata:"
+cat "$metadata"
 
 response_file="$MOD_DIR/build/curseforge-update-response.json"
 status_code="$(

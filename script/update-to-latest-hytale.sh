@@ -21,6 +21,20 @@ target_game_version_name="${CURSEFORGE_GAME_VERSION_NAME:-$current_game_version_
 versions_file="$MOD_DIR/build/curseforge-hytale-versions.json"
 latest_file="$MOD_DIR/build/latest-hytale-version.txt"
 
+if [ -n "$target_game_version_name" ] && [ -n "$current_game_version_id" ]; then
+  echo "Hytale pin is current: $current_hytale_version (CurseForge game version $current_game_version_id, $target_game_version_name)"
+  if [ -n "${GITHUB_OUTPUT:-}" ]; then
+    {
+      echo "changed=false"
+      echo "mod_version=$current_mod_version"
+      echo "hytale_version=$current_hytale_version"
+      echo "game_version_id=$current_game_version_id"
+      echo "game_version_name=$target_game_version_name"
+    } >> "$GITHUB_OUTPUT"
+  fi
+  exit 0
+fi
+
 mkdir -p "$MOD_DIR/build"
 curl -fsSL \
   -H "X-Api-Token: $CURSEFORGE_API_TOKEN" \
