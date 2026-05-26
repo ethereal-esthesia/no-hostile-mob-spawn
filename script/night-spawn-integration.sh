@@ -5,13 +5,32 @@ MOD_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 MOD_DIR="$(cd "$MOD_SCRIPT_DIR/.." && pwd)"
 REPO_ROOT="$(cd "$MOD_DIR/../.." && pwd)"
 
-# shellcheck disable=SC1091
-source "$REPO_ROOT/script/common.sh"
+if [ -f "$REPO_ROOT/script/common.sh" ]; then
+  # shellcheck disable=SC1091
+  source "$REPO_ROOT/script/common.sh"
+fi
 
 fail() {
   echo "NoHostileMobSpawn manual spawn integration test failed: $*" >&2
   exit 1
 }
+
+if ! declare -F ensure_command >/dev/null 2>&1; then
+  ensure_command() {
+    local cmd="$1"
+
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+      fail "missing required command: $cmd"
+    fi
+  }
+fi
+
+if ! declare -F ensure_java >/dev/null 2>&1; then
+  ensure_java() {
+    JAVA_CMD="${JAVA_CMD:-java}"
+    ensure_command "$JAVA_CMD"
+  }
+fi
 
 usage() {
   cat >&2 <<EOF

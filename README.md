@@ -61,7 +61,7 @@ The default spawn coordinate is `1062,80,283`; override it with
 Release metadata is pinned in `mod.properties`.
 
 ```bash
-./mods/NoHostileMobSpawn/script/set-release-version.sh --patch
+./mods/NoHostileMobSpawn/script/prod-release-if-hytale-changed.sh
 ./mods/NoHostileMobSpawn/script/test-all.sh
 ```
 
@@ -71,29 +71,37 @@ The release artifact is written to:
 build/libs/NoHostileMobSpawn-<modVersion>-hytale-<hytaleServerVersion>.jar
 ```
 
-Use `set-release-version.sh` to intentionally change the code release version;
-commit and push that version change to `main` to publish. The publish workflow
-uses the commit where `modVersion` changed as the release target, so later
-non-version commits in the same push do not become the release artifact.
-Pushes to `main`, version-change publishes, manual releases, manual CurseForge
-publishes, and weekly releases run `test-all.sh` before a jar can be published.
-The manual `Release Dry Run` workflow verifies the same test/build path without
-creating a tag, GitHub release, or CurseForge upload.
+Use `prod-release-if-hytale-changed.sh` on the prod server to update release
+pins. Automation runs it without a version argument, so it bumps the patch
+version only when prod's installed Hytale runtime changed. Manual runs can pass
+`--mod-version <version>` to choose the mod release version explicitly. The
+publish workflow uses the commit where `modVersion` changed as the release
+target, so later non-version commits in the same push do not become the release
+artifact.
 
-## Weekly Hytale Releases
+## Prod Hytale Releases
 
-The `Weekly Hytale Release` workflow checks CurseForge's Hytale game-version
-list once per week. If CurseForge has a newer Hytale version than the pinned
-`hytaleServerVersion`, it:
+Schedule release checks on the prod server rather than in GitHub Actions. The
+prod job reads the installed Hytale runtime version, updates this mod's release
+pin if needed, runs the full temp-server test suite, commits the pin update, and
+pushes it to GitHub.
+
+```bash
+./script/prod-release-if-hytale-changed.sh --push
+./script/prod-release-if-hytale-changed.sh --mod-version 1.0.3 --push
+```
+
+If prod has a newer Hytale runtime than the pinned `hytaleServerVersion`, the
+script:
 
 1. Updates `mod.properties`.
 2. Bumps the mod patch version.
-3. Runs the full `test-all.sh` release path.
+3. Runs the full `test-all.sh` release path on prod.
 4. Commits the new pin.
-5. Creates a GitHub release.
-6. Publishes the release jar to CurseForge.
+5. Pushes the version-pin commit when `--push` is provided.
+6. Lets GitHub publish the jar from that version-change commit.
 
-Like the push publish workflow, the weekly workflow targets the commit where
+Like the push publish workflow, the prod release script targets the commit where
 `modVersion` changed rather than whatever commit happens to be newest.
 
 The CurseForge project page is:
@@ -106,9 +114,6 @@ Required GitHub configuration:
 
 ```text
 Secret:   CURSEFORGE_API_TOKEN
-Secret:   HYTALE_RUNTIME_ARCHIVE_URL
-Secret:   HYTALE_RUNTIME_ARCHIVE_SHA256
-Secret:   HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER (optional)
 Variable: CURSEFORGE_PROJECT_ID
 ```
 

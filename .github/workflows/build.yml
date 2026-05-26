@@ -22,18 +22,5 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Prepare Hytale runtime
-        if: github.event_name != 'pull_request'
-        env:
-          HYTALE_RUNTIME_ARCHIVE_URL: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_URL }}
-          HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER }}
-          HYTALE_RUNTIME_ARCHIVE_SHA256: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_SHA256 }}
-        run: ./script/ci-prepare-hytale-runtime.sh
-
-      - name: Run all tests
-        if: github.event_name != 'pull_request'
-        run: ./script/test-all.sh
-
       - name: Build release artifact
-        if: github.event_name == 'pull_request'
         run: ./script/build-release.sh

@@ -26,13 +26,6 @@ jobs:
           distribution: temurin
           java-version: '25'
 
-      - name: Prepare Hytale runtime
-        env:
-          HYTALE_RUNTIME_ARCHIVE_URL: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_URL }}
-          HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER }}
-          HYTALE_RUNTIME_ARCHIVE_SHA256: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_SHA256 }}
-        run: ./script/ci-prepare-hytale-runtime.sh
-
       - name: Validate CurseForge configuration
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
@@ -41,8 +34,8 @@ jobs:
           test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
           test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
 
-      - name: Run all tests
-        run: ./script/test-all.sh
+      - name: Build release artifact
+        run: ./script/build-release.sh
 
       - name: Publish to CurseForge
         env:
