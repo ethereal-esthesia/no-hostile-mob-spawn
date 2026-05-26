@@ -40,6 +40,14 @@ jobs:
           distribution: temurin
           java-version: '25'
 
+      - name: Prepare Hytale runtime
+        if: steps.release.outputs.changed == 'true'
+        env:
+          HYTALE_RUNTIME_ARCHIVE_URL: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_URL }}
+          HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER }}
+          HYTALE_RUNTIME_ARCHIVE_SHA256: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_SHA256 }}
+        run: ./script/ci-prepare-hytale-runtime.sh
+
       - name: Validate CurseForge configuration
         if: steps.release.outputs.changed == 'true'
         env:
@@ -68,9 +76,9 @@ jobs:
             exit 1
           fi
 
-      - name: Build release artifact
+      - name: Run all tests
         if: steps.release.outputs.changed == 'true'
-        run: ./script/build-release.sh
+        run: ./script/test-all.sh
 
       - name: Create GitHub release
         if: steps.release.outputs.changed == 'true'
@@ -85,7 +93,7 @@ jobs:
             build/libs/NoHostileMobSpawn-"$VERSION"-hytale-"$HYTALE_VERSION".jar \
             --target "$RELEASE_COMMIT" \
             --title "NoHostileMobSpawn $VERSION for Hytale $HYTALE_VERSION" \
-            --notes "Release $VERSION for Hytale $HYTALE_VERSION. Smoke tests passed before publishing."
+            --notes "Release $VERSION for Hytale $HYTALE_VERSION. All tests passed before publishing."
 
       - name: Publish to CurseForge
         if: steps.release.outputs.changed == 'true'

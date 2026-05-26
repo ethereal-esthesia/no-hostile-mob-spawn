@@ -59,9 +59,17 @@ jobs:
         id: release
         run: ./script/latest-version-change.sh HEAD~1 HEAD
 
-      - name: Build release artifact
+      - name: Prepare Hytale runtime
         if: steps.hytale.outputs.changed == 'true'
-        run: ./script/build-release.sh
+        env:
+          HYTALE_RUNTIME_ARCHIVE_URL: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_URL }}
+          HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER }}
+          HYTALE_RUNTIME_ARCHIVE_SHA256: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_SHA256 }}
+        run: ./script/ci-prepare-hytale-runtime.sh
+
+      - name: Run all tests
+        if: steps.hytale.outputs.changed == 'true'
+        run: ./script/test-all.sh
 
       - name: Refuse duplicate tag
         if: steps.hytale.outputs.changed == 'true'
@@ -89,7 +97,7 @@ jobs:
             build/libs/NoHostileMobSpawn-"$VERSION"-hytale-"$HYTALE_VERSION".jar \
             --target "$RELEASE_COMMIT" \
             --title "NoHostileMobSpawn $VERSION for Hytale $HYTALE_VERSION" \
-            --notes "Automated release for Hytale $HYTALE_VERSION. Smoke tests passed before publishing."
+            --notes "Automated release for Hytale $HYTALE_VERSION. All tests passed before publishing."
 
       - name: Publish to CurseForge
         if: steps.hytale.outputs.changed == 'true'

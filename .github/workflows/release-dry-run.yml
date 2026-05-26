@@ -1,20 +1,27 @@
-name: Build and Smoke Test
+name: Release Dry Run
 
 on:
-  push:
-    branches: [main]
-  pull_request:
-  schedule:
-    - cron: '29 10 * * 1'
   workflow_dispatch:
+    inputs:
+      ref:
+        description: Git ref to test.
+        required: false
+        default: main
+        type: string
+
+permissions:
+  contents: read
 
 jobs:
-  build-and-smoke-test:
+  release-dry-run:
     runs-on: ubuntu-latest
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || 'main' }}
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -23,7 +30,6 @@ jobs:
           java-version: '25'
 
       - name: Prepare Hytale runtime
-        if: github.event_name != 'pull_request'
         env:
           HYTALE_RUNTIME_ARCHIVE_URL: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_URL }}
           HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER: ${{ secrets.HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER }}
@@ -31,9 +37,14 @@ jobs:
         run: ./script/ci-prepare-hytale-runtime.sh
 
       - name: Run all tests
-        if: github.event_name != 'pull_request'
         run: ./script/test-all.sh
 
-      - name: Build release artifact
-        if: github.event_name == 'pull_request'
-        run: ./script/build-release.sh
+      - name: Report release artifact
+        run: |
+          version="$(./script/project-version.sh)"
+          hytale_version="$(./script/hytale-version.sh)"
+          artifact="build/libs/NoHostileMobSpawn-${version}-hytale-${hytale_version}.jar"
+          test -f "$artifact"
+          echo "Dry run passed."
+          echo "Would create tag: v${version}"
+          echo "Would publish artifact: $artifact"

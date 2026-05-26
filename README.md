@@ -62,7 +62,7 @@ Release metadata is pinned in `mod.properties`.
 
 ```bash
 ./mods/NoHostileMobSpawn/script/set-release-version.sh --patch
-./mods/NoHostileMobSpawn/script/build-release.sh
+./mods/NoHostileMobSpawn/script/test-all.sh
 ```
 
 The release artifact is written to:
@@ -74,12 +74,11 @@ build/libs/NoHostileMobSpawn-<modVersion>-hytale-<hytaleServerVersion>.jar
 Use `set-release-version.sh` to intentionally change the code release version;
 commit and push that version change to `main` to publish. The publish workflow
 uses the commit where `modVersion` changed as the release target, so later
-non-version commits in the same push do not become the release artifact. The
-manual `Release` workflow remains available from `main` by typing `release`.
-Both paths smoke test, build the artifact, create tag `v<modVersion>`, attach
-the jar-format package to a GitHub release, and publish that jar to CurseForge
-when `CURSEFORGE_API_TOKEN` and the `CURSEFORGE_PROJECT_ID` repository variable
-are configured.
+non-version commits in the same push do not become the release artifact.
+Pushes to `main`, version-change publishes, manual releases, manual CurseForge
+publishes, and weekly releases run `test-all.sh` before a jar can be published.
+The manual `Release Dry Run` workflow verifies the same test/build path without
+creating a tag, GitHub release, or CurseForge upload.
 
 ## Weekly Hytale Releases
 
@@ -89,7 +88,7 @@ list once per week. If CurseForge has a newer Hytale version than the pinned
 
 1. Updates `mod.properties`.
 2. Bumps the mod patch version.
-3. Runs the smoke/build release path.
+3. Runs the full `test-all.sh` release path.
 4. Commits the new pin.
 5. Creates a GitHub release.
 6. Publishes the release jar to CurseForge.
@@ -107,6 +106,9 @@ Required GitHub configuration:
 
 ```text
 Secret:   CURSEFORGE_API_TOKEN
+Secret:   HYTALE_RUNTIME_ARCHIVE_URL
+Secret:   HYTALE_RUNTIME_ARCHIVE_SHA256
+Secret:   HYTALE_RUNTIME_ARCHIVE_AUTH_HEADER (optional)
 Variable: CURSEFORGE_PROJECT_ID
 ```
 
