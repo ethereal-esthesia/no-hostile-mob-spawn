@@ -77,6 +77,9 @@ fi
 "$MOD_DIR/script/ci-use-prod-hytale-runtime.sh"
 
 if [ "$check_ready" -eq 1 ]; then
+  if [ "$push" -eq 1 ]; then
+    git push --dry-run origin HEAD:main >/dev/null
+  fi
   echo "NoHostileMobSpawn release check is ready."
   exit 0
 fi
