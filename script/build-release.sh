@@ -58,13 +58,18 @@ dest = Path(sys.argv[2])
 fallback_name = sys.argv[3]
 hytale_version = sys.argv[4]
 
+def server_version_range(version):
+    if version.startswith(("=", "^", "~")) or version.endswith(".x"):
+        return version
+    return f"={version}"
+
 with (source / "package.json").open() as f:
     manifest = json.load(f)
 
 manifest.setdefault("Group", "Codex")
 manifest.setdefault("Name", fallback_name)
 manifest.setdefault("Version", "1.0.0")
-manifest["ServerVersion"] = hytale_version
+manifest["ServerVersion"] = server_version_range(hytale_version)
 
 with (dest / "manifest.json").open("w") as f:
     json.dump(manifest, f, indent=2)

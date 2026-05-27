@@ -210,8 +210,7 @@ build_chunk_loader_plugin() {
 package com.etherealesthesia.hytale.nohostilemobspawn.test;
 
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Vector3d;
-import com.hypixel.hytale.math.vector.Vector3f;
+import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
@@ -236,6 +235,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import org.joml.Vector3d;
 
 public final class TestChunkLoaderPlugin extends JavaPlugin {
     public TestChunkLoaderPlugin(JavaPluginInit init) {
@@ -312,7 +312,7 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
                 doubleEnv("NO_HOSTILE_TEST_SPAWN_X", 1062.0),
                 doubleEnv("NO_HOSTILE_TEST_SPAWN_Y", 80.0),
                 doubleEnv("NO_HOSTILE_TEST_SPAWN_Z", 283.0));
-        Vector3f rotation = new Vector3f(0.0f, 0.0f, 0.0f);
+        Rotation3f rotation = new Rotation3f(0.0f, 0.0f, 0.0f);
         double tolerance = doubleEnv("NO_HOSTILE_TEST_POSITION_TOLERANCE", 0.01);
         Store<EntityStore> store = world.getEntityStore().getStore();
         int suppressedCount = probeRoles("suppressed", suppressedRoles, store, expected, rotation, tolerance);
@@ -335,7 +335,7 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
             List<String> roles,
             Store<EntityStore> store,
             Vector3d expected,
-            Vector3f rotation,
+            Rotation3f rotation,
             double tolerance) {
         int tested = 0;
 
@@ -358,7 +358,7 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
                 }
 
                 Vector3d actual = transform.getPosition();
-                if (actual == null || actual.distanceTo(expected) > tolerance) {
+                if (actual == null || actual.distance(expected) > tolerance) {
                     failManualProbe("spawned " + label + " role moved or spawned at the wrong position: " + role
                             + " expected=" + expected + " actual=" + actual, null);
                     return -1;
@@ -615,11 +615,16 @@ if version_file and version_file.exists():
     marker = version_file.read_text().strip()
     version = marker.split(":", 1)[1] if marker.startswith("hytale:") else marker
 
+def server_version_range(value):
+    if value.startswith(("=", "^", "~")) or value.endswith(".x"):
+        return value
+    return f"={value}"
+
 manifest.setdefault("Group", "Codex")
 manifest.setdefault("Name", "NoHostileMobSpawn")
 manifest.setdefault("Version", "1.0.0")
 if version:
-    manifest["ServerVersion"] = version
+    manifest["ServerVersion"] = server_version_range(version)
 
 with manifest_json.open("w") as f:
     json.dump(manifest, f, indent=2)
