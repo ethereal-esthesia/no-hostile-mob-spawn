@@ -8,6 +8,7 @@ CURSEFORGE_API_TOKEN="${CURSEFORGE_API_TOKEN:-}"
 CURSEFORGE_PROJECT_ID="${CURSEFORGE_PROJECT_ID:-}"
 CURSEFORGE_FILE_ID="${CURSEFORGE_FILE_ID:-}"
 CURSEFORGE_GAME_VERSION_ID="${CURSEFORGE_GAME_VERSION_ID:-}"
+CURSEFORGE_CHANGELOG_ONLY="${CURSEFORGE_CHANGELOG_ONLY:-false}"
 
 source "$MOD_DIR/script/properties-lib.sh"
 
@@ -31,22 +32,26 @@ if [ -z "$CURSEFORGE_FILE_ID" ]; then
   exit 1
 fi
 
-if [ -z "$hytale_game_version_id" ]; then
+if [ "$CURSEFORGE_CHANGELOG_ONLY" != "true" ] && [ -z "$hytale_game_version_id" ]; then
   echo "hytaleGameVersionId is empty in mod.properties; CurseForge file updates require the numeric Hytale game version ID." >&2
   exit 1
 fi
 
-echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game_version_name:-Hytale $hytale_version}."
+if [ "$CURSEFORGE_CHANGELOG_ONLY" = "true" ]; then
+  echo "Updating CurseForge changelog only."
+else
+  echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game_version_name:-Hytale $hytale_version}."
+fi
 
 metadata="$MOD_DIR/build/curseforge-update-metadata.json"
 mkdir -p "$MOD_DIR/build"
-python3 - "$metadata" "$CURSEFORGE_FILE_ID" "$hytale_game_version_id" "$mod_version" "$hytale_version" "$MOD_DIR/CHANGELOG.md" <<'PY'
+python3 - "$metadata" "$CURSEFORGE_FILE_ID" "$hytale_game_version_id" "$mod_version" "$hytale_version" "$MOD_DIR/CHANGELOG.md" "$CURSEFORGE_CHANGELOG_ONLY" <<'PY'
 import json
 import re
 import sys
 from pathlib import Path
 
-path, file_id, game_version_id, mod_version, hytale_version, changelog_path = sys.argv[1:]
+path, file_id, game_version_id, mod_version, hytale_version, changelog_path, changelog_only = sys.argv[1:]
 
 def changelog_for_version(path, version):
     changelog = Path(path)
@@ -71,8 +76,9 @@ metadata = {
     "changelog": changelog_for_version(changelog_path, mod_version),
     "changelogType": "markdown",
     "fileID": int(file_id),
-    "gameVersions": [int(game_version_id)],
 }
+if changelog_only != "true":
+    metadata["gameVersions"] = [int(game_version_id)]
 Path(path).write_text(json.dumps(metadata, indent=2) + "\n")
 PY
 

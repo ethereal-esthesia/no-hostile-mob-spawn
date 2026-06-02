@@ -15,6 +15,10 @@ on:
         description: Optional CurseForge game version ID override.
         required: false
         type: string
+      changelog_only:
+        description: Set to "true" to update only the file changelog.
+        required: false
+        type: string
 
 permissions:
   contents: read
@@ -42,4 +46,5 @@ jobs:
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
           CURSEFORGE_FILE_ID: ${{ inputs.file_id }}
           CURSEFORGE_GAME_VERSION_ID: ${{ inputs.game_version_id }}
+          CURSEFORGE_CHANGELOG_ONLY: ${{ inputs.changelog_only }}
         run: ./script/update-curseforge-file.sh
