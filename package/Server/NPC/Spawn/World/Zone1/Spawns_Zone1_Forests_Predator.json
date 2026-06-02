@@ -1,0 +1,17 @@
+{
+  "Environments": [
+    "Env_Zone1_Forests",
+    "Env_Zone1_Autumn",
+    "Env_Zone1_Azure"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_df7396d94f40"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

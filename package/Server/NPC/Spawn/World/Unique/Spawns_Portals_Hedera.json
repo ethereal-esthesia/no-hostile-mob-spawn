@@ -1,0 +1,21 @@
+{
+  "Environments": [
+    "Env_Portals_Hedera"
+  ],
+  "NPCs": [
+    {
+      "Weight": 15,
+      "SpawnBlockSet": "Soil",
+      "Id": "Frog_Blue"
+    },
+    {
+      "Weight": 10,
+      "SpawnBlockSet": "Soil",
+      "Id": "Raven"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

@@ -1,0 +1,16 @@
+{
+  "Environments": [
+    "Env_Zone4_Wastes",
+    "Env_Zone4_Shores"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_9d4d77e61d47"
+    }
+  ],
+  "DayTimeRange": [
+    0,
+    24
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone1_Plains"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_a092c756a239"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    24
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone3_Outlander"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_25cc39138dfa"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone1_Swamps"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_256a73ea82d3"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    24
+  ]
+}

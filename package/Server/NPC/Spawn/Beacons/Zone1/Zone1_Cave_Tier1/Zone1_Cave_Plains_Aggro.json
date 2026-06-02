@@ -1,0 +1,32 @@
+{
+  "Environments": [
+    "Env_Zone1_Caves_Plains"
+  ],
+  "MinDistanceFromPlayer": 15,
+  "MaxSpawnedNPCs": 2,
+  "ConcurrentSpawnsRange": [
+    1,
+    2
+  ],
+  "SpawnAfterGameTimeRange": [
+    "PT20M",
+    "PT60M"
+  ],
+  "NPCIdleDespawnTime": 25,
+  "BeaconVacantDespawnGameTime": "PT15M",
+  "BeaconRadius": 70,
+  "SpawnRadius": 50,
+  "TargetDistanceFromPlayer": 20,
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_56eb2a240191"
+    }
+  ],
+  "LightRanges": {
+    "Light": [
+      0,
+      2
+    ]
+  }
+}

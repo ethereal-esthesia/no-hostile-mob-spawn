@@ -1,0 +1,16 @@
+{
+  "Environments": [
+    "Env_Zone2_Plateaus",
+    "Env_Zone2_Scrub"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_b5d82012b62b"
+    }
+  ],
+  "DayTimeRange": [
+    0,
+    24
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "Environments": [
+    "Env_Zone1_Swamps",
+    "Env_Zone1_Azure"
+  ],
+  "NPCs": [
+    {
+      "Weight": 15,
+      "Id": "Pike",
+      "SpawnFluidTag": "Water"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    24
+  ]
+}

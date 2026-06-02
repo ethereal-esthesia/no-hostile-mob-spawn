@@ -1,0 +1,32 @@
+{
+  "Environments": [
+    "Env_Zone1_Caves_Spiders"
+  ],
+  "MinDistanceFromPlayer": 10,
+  "MaxSpawnedNPCs": 3,
+  "ConcurrentSpawnsRange": [
+    1,
+    2
+  ],
+  "SpawnAfterGameTimeRange": [
+    "PT20M",
+    "PT40M"
+  ],
+  "NPCIdleDespawnTime": 25,
+  "BeaconVacantDespawnGameTime": "PT15M",
+  "BeaconRadius": 50,
+  "SpawnRadius": 40,
+  "TargetDistanceFromPlayer": 20,
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_62d4e2e2e62b"
+    }
+  ],
+  "LightRanges": {
+    "Light": [
+      0,
+      2
+    ]
+  }
+}

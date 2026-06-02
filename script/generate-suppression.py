@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import csv
 import fnmatch
+import hashlib
 import json
 import sys
 import zipfile
@@ -11,8 +12,18 @@ SUPPRESSION_RELATIVE_PATHS = [
     Path("Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.json"),
     Path("Server/NPC/Spawn/Suppression/Peaceful_No_Hostiles.json"),
 ]
+WORLD_SUPPRESSOR_RELATIVE_PATHS = [
+    Path("Server/Instances/Defaults/Default/resources/SpawnSuppressionController.json"),
+    Path("Server/Instances/Defaults/Default_Flat/resources/SpawnSuppressionController.json"),
+    Path("Server/Instances/Defaults/Default_Old/resources/SpawnSuppressionController.json"),
+    Path("Server/Instances/Defaults/Default_Void/resources/SpawnSuppressionController.json"),
+]
+WORLD_SUPPRESSOR_ID = "f2187cb4-10df-365e-822a-f509f71cb500"
+SUPPRESSION_RADIUS = 2000
 HOSTILE_GROUP_NAME = "NoHostileMobSpawn_Hostiles"
 HOSTILE_GROUP_RELATIVE_PATH = Path(f"Server/NPC/Groups/{HOSTILE_GROUP_NAME}.json")
+SPAWN_PLACEHOLDER_ROLE = "Bat"
+SPAWN_PLACEHOLDER_WEIGHT = 1
 MOB_DROPS_CSV_RELATIVE_PATH = Path("Reports/Mob_Drops.csv")
 MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH = Path("Reports/Mob_Only_Recipe_Items.csv")
 ALWAYS_SUPPRESS = ["Aggressive", HOSTILE_GROUP_NAME]
@@ -44,6 +55,7 @@ def load_json_assets(assets_zip):
     groups = {}
     drops = {}
     recipes = {}
+    spawns = {}
 
     with zipfile.ZipFile(assets_zip) as archive:
         for info in archive.infolist():
@@ -64,8 +76,10 @@ def load_json_assets(assets_zip):
                 drops[path] = document
             elif path.parts[:3] == ("Server", "Item", "Recipes"):
                 recipes[path] = document
+            elif path.parts[:3] == ("Server", "NPC", "Spawn"):
+                spawns[path] = document
 
-    return roles, groups, drops, recipes
+    return roles, groups, drops, recipes, spawns
 
 
 def collect_parameters(roles, role_name, seen=None):
@@ -387,6 +401,68 @@ def write_mob_only_recipe_items_csv(roles, drops, hostile_roles, recipes, path):
     return len(rows), missing_count, preserved_count
 
 
+def spawn_entry_role(entry):
+    if not isinstance(entry, dict):
+        return ""
+
+    for key in ("Id", "Name"):
+        value = entry.get(key)
+        if isinstance(value, str):
+            return value
+
+    return ""
+
+
+def spawn_entry_role_key(entry):
+    if isinstance(entry, dict) and isinstance(entry.get("Name"), str):
+        return "Name"
+
+    return "Id"
+
+
+def disabled_spawn_role_name(path):
+    digest = hashlib.sha1(str(path).encode("utf-8")).hexdigest()[:12]
+    return f"NoHostileMobSpawn_Disabled_{digest}"
+
+
+def filtered_spawn_documents(spawns, hostile_roles):
+    hostile_role_set = set(hostile_roles)
+    for path, document in spawns.items():
+        npcs = document.get("NPCs")
+        if not isinstance(npcs, list):
+            continue
+
+        kept = [
+            entry
+            for entry in npcs
+            if spawn_entry_role(entry) not in hostile_role_set
+        ]
+        removed_count = len(npcs) - len(kept)
+        if removed_count == 0:
+            continue
+
+        filtered_document = dict(document)
+        disabled_role_name = ""
+        if not kept:
+            role_key = "Id"
+            for entry in npcs:
+                if isinstance(entry, dict):
+                    role_key = spawn_entry_role_key(entry)
+                    break
+
+            disabled_role_name = disabled_spawn_role_name(path)
+            kept = [
+                {
+                    "Weight": SPAWN_PLACEHOLDER_WEIGHT,
+                    role_key: disabled_role_name,
+                }
+            ]
+
+        filtered_document["NPCs"] = kept
+
+        yield path, filtered_document, removed_count, len(npcs), disabled_role_name
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: generate-suppression.py ASSETS_ZIP PACKAGE_DEST", file=sys.stderr)
@@ -398,22 +474,26 @@ def main():
         print(f"Error: Assets.zip not found: {assets_zip}", file=sys.stderr)
         return 1
 
-    roles, groups, drops, recipes = load_json_assets(assets_zip)
+    roles, groups, drops, recipes, spawns = load_json_assets(assets_zip)
     hostile_roles = generated_hostile_roles(roles, groups)
+    spawn_documents = list(filtered_spawn_documents(spawns, hostile_roles))
     hostile_group_path = package_dest / HOSTILE_GROUP_RELATIVE_PATH
     suppression_paths = [package_dest / path for path in SUPPRESSION_RELATIVE_PATHS]
+    world_suppressor_paths = [
+        package_dest / path for path in WORLD_SUPPRESSOR_RELATIVE_PATHS
+    ]
     mob_drops_csv_path = package_dest / MOB_DROPS_CSV_RELATIVE_PATH
     mob_only_recipe_items_csv_path = package_dest / MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH
     hostile_group_path.parent.mkdir(parents=True, exist_ok=True)
-    for suppression_path in suppression_paths:
-        suppression_path.parent.mkdir(parents=True, exist_ok=True)
+    for generated_path in suppression_paths + world_suppressor_paths:
+        generated_path.parent.mkdir(parents=True, exist_ok=True)
 
     with hostile_group_path.open("w") as f:
         json.dump({"IncludeRoles": hostile_roles}, f, indent=2)
         f.write("\n")
 
     suppression_document = {
-        "SuppressionRadius": 2000,
+        "SuppressionRadius": SUPPRESSION_RADIUS,
         "SuppressedGroups": ALWAYS_SUPPRESS,
         "SuppressSpawnMarkers": True,
     }
@@ -422,9 +502,75 @@ def main():
             json.dump(suppression_document, f, indent=2)
             f.write("\n")
 
+    world_suppressor_document = {
+        "SpawnSuppressorMap": {
+            WORLD_SUPPRESSOR_ID: {
+                "Position": {
+                    "X": 0.0,
+                    "Y": 128.0,
+                    "Z": 0.0,
+                },
+                "Suppression": "No_Hostile_Mob_Spawn",
+            }
+        }
+    }
+    for world_suppressor_path in world_suppressor_paths:
+        with world_suppressor_path.open("w") as f:
+            json.dump(world_suppressor_document, f, indent=2)
+            f.write("\n")
+
+    disabled_role_names = sorted(
+        {
+            disabled_role_name
+            for _, _, _, _, disabled_role_name in spawn_documents
+            if disabled_role_name
+        }
+    )
+    for disabled_role_name in disabled_role_names:
+        output_path = (
+            package_dest
+            / "Server"
+            / "NPC"
+            / "Roles"
+            / "NoHostileMobSpawn"
+            / f"{disabled_role_name}.json"
+        )
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w") as f:
+            json.dump(
+                {
+                    "Type": "Variant",
+                    "Reference": SPAWN_PLACEHOLDER_ROLE,
+                    "Modify": {},
+                },
+                f,
+                indent=2,
+            )
+            f.write("\n")
+
+    for spawn_path, spawn_document, _, _, _ in spawn_documents:
+        output_path = package_dest / spawn_path
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w") as f:
+            json.dump(spawn_document, f, indent=2)
+            f.write("\n")
+
     print(
         f"Generated NoHostileMobSpawn hostile role group: "
         f"{HOSTILE_GROUP_NAME} ({len(hostile_roles)} roles)"
+    )
+    disabled_spawn_count = sum(
+        1
+        for _, _, removed_count, original_count, _ in spawn_documents
+        if removed_count == original_count
+    )
+    removed_spawn_entry_count = sum(
+        removed_count for _, _, removed_count, _, _ in spawn_documents
+    )
+    print(
+        "Generated hostile spawn overrides: "
+        f"{len(spawn_documents)} assets, {removed_spawn_entry_count} entries removed, "
+        f"{disabled_spawn_count} assets disabled"
     )
     drop_row_count, unique_drop_item_count, mob_count = write_mob_drops_csv(
         roles,

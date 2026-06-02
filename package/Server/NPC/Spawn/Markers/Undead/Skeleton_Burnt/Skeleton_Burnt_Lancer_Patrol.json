@@ -1,0 +1,12 @@
+{
+  "Model": "NPC_Spawn_Marker",
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Name": "NoHostileMobSpawn_Disabled_aea4f6f194df"
+    }
+  ],
+  "ExclusionRadius": 10,
+  "MaxDropHeight": 4,
+  "DeactivationDistance": 150
+}

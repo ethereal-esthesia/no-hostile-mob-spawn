@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone3_Glacial"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_79b9af418ee7"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

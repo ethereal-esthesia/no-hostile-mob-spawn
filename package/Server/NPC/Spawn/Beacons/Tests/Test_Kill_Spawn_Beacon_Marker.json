@@ -1,0 +1,16 @@
+{
+  "Environments": [],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_e40043a0d9d2"
+    }
+  ],
+  "MaxSpawnedNPCs": 4,
+  "NPCIdleDespawnTime": 5,
+  "SpawnAfterGameTimeRange": [
+    "PT5M",
+    "PT10M"
+  ],
+  "NPCSpawnState": "Chase"
+}

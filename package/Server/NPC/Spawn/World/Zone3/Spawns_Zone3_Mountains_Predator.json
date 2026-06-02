@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone3_Mountains"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_c08a2e59370d"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

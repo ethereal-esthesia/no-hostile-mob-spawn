@@ -1,0 +1,11 @@
+{
+  "Model": "NPC_Spawn_Marker",
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Name": "NoHostileMobSpawn_Disabled_d523a2f1e37c"
+    }
+  ],
+  "ExclusionRadius": 0,
+  "RealtimeRespawn": true
+}

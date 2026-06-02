@@ -1,0 +1,13 @@
+{
+  "Environments": [
+    "Env_Zone3_Shores"
+  ],
+  "NPCs": [
+    {
+      "Weight": 10,
+      "SpawnBlockSet": "IceAndSnow",
+      "Id": "Penguin",
+      "Flock": "Group_Medium"
+    }
+  ]
+}

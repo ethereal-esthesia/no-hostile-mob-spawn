@@ -1,0 +1,16 @@
+{
+  "Environments": [
+    "Env_Zone2_Deserts",
+    "Env_Zone2_Oasis"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_484fedb7e74f"
+    }
+  ],
+  "DayTimeRange": [
+    0,
+    24
+  ]
+}

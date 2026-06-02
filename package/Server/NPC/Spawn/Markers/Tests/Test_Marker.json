@@ -1,0 +1,19 @@
+{
+  "Model": "NPC_Spawn_Marker",
+  "NPCs": [
+    {
+      "Weight": 10,
+      "RealtimeRespawnTime": 5
+    },
+    {
+      "Name": "Sheep",
+      "Weight": 20,
+      "RealtimeRespawnTime": 5,
+      "Flock": "Parent_And_Young_75_25"
+    }
+  ],
+  "ExclusionRadius": 10,
+  "RealtimeRespawn": true,
+  "MaxDropHeight": 4,
+  "DeactivationDistance": 150
+}

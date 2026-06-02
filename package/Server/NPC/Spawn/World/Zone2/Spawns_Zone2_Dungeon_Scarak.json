@@ -1,0 +1,17 @@
+{
+  "Environments": [
+    "Env_Zone2_Dungeons"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_24e6d64d652b"
+    }
+  ],
+  "LightRanges": {
+    "Light": [
+      0,
+      7
+    ]
+  }
+}

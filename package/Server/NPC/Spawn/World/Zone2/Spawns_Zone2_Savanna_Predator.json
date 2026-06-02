@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone2_Savanna"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_26e20a77bbd6"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

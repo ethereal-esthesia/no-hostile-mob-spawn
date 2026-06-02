@@ -1,0 +1,22 @@
+{
+  "Environments": [],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_c796efc6e796"
+    }
+  ],
+  "SpawnAfterRealTimeRange": [
+    "PT1S",
+    "PT1S"
+  ],
+  "MinDistanceFromPlayer": 3,
+  "MaxSpawnedNPCs": 5,
+  "ConcurrentSpawnsRange": [
+    1,
+    1
+  ],
+  "BeaconRadius": 50,
+  "TargetDistanceFromPlayer": 25,
+  "SpawnRadius": 6
+}

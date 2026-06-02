@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone3_Tundra"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_9ed027b2157d"
+    }
+  ],
+  "DayTimeRange": [
+    0,
+    24
+  ]
+}

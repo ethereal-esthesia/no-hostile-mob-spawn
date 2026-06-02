@@ -1,0 +1,17 @@
+{
+  "Model": "NPC_Spawn_Marker",
+  "NPCs": [
+    {
+      "Weight": 10,
+      "SpawnAfterGameTime": "P1D"
+    },
+    {
+      "Name": "Sheep",
+      "Weight": 20,
+      "SpawnAfterGameTime": "PT15M",
+      "Flock": "Parent_And_Young_75_25"
+    }
+  ],
+  "ExclusionRadius": 10,
+  "RealtimeRespawn": false
+}

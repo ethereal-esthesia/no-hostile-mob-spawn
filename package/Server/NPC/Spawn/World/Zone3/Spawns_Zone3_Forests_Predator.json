@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone3_Forests"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_4cd98cf1c0f0"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

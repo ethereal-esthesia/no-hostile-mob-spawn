@@ -1,0 +1,32 @@
+{
+  "Environments": [
+    "Env_Zone1_Caves_Goblins"
+  ],
+  "MinDistanceFromPlayer": 15,
+  "MaxSpawnedNPCs": 3,
+  "ConcurrentSpawnsRange": [
+    1,
+    2
+  ],
+  "SpawnAfterGameTimeRange": [
+    "PT20M",
+    "PT40M"
+  ],
+  "NPCIdleDespawnTime": 60,
+  "BeaconVacantDespawnGameTime": "PT15M",
+  "BeaconRadius": 50,
+  "SpawnRadius": 40,
+  "TargetDistanceFromPlayer": 25,
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_2d18bcf9faef"
+    }
+  ],
+  "LightRanges": {
+    "Light": [
+      0,
+      2
+    ]
+  }
+}

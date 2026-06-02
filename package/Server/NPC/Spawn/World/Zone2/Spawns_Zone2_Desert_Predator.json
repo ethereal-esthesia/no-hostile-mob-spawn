@@ -1,0 +1,15 @@
+{
+  "Environments": [
+    "Env_Zone2_Deserts"
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_d63e51044fb7"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

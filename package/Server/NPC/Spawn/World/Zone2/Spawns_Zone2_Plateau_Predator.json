@@ -1,0 +1,16 @@
+{
+  "Environments": [
+    "Env_Zone2_Plateaus"
+  ],
+  "NPCs": [
+    {
+      "Weight": 5,
+      "SpawnBlockSet": "Soil",
+      "Id": "Vulture"
+    }
+  ],
+  "DayTimeRange": [
+    6,
+    18
+  ]
+}

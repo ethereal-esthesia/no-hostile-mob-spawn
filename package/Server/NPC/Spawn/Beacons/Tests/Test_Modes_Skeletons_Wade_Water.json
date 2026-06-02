@@ -1,0 +1,23 @@
+{
+  "Model": "Mannequin",
+  "Environments": [],
+  "TargetDistanceFromPlayer": 8,
+  "MinDistanceFromPlayer": 2,
+  "Debug": "All",
+  "MaxSpawnedNPCs": 10,
+  "ConcurrentSpawnsRange": [
+    3,
+    3
+  ],
+  "SpawnAfterRealTimeRange": [
+    "PT1S",
+    "PT1S"
+  ],
+  "NPCIdleDespawnTime": 1,
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_ea6bfbe4fb4a"
+    }
+  ]
+}

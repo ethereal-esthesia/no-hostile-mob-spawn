@@ -1,0 +1,36 @@
+{
+  "Environments": [
+    "Env_Zone1_Plains",
+    "Env_Zone2_Savanna",
+    "Env_Zone3_Tundra"
+  ],
+  "Despawn": {
+    "DayTimeRange": [
+      5,
+      19
+    ]
+  },
+  "MoonPhaseWeightModifiers": [
+    0,
+    0.5,
+    0,
+    0.5,
+    0.5
+  ],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_86653b6dfab9"
+    }
+  ],
+  "DayTimeRange": [
+    19,
+    5
+  ],
+  "LightRanges": {
+    "Light": [
+      0,
+      8
+    ]
+  }
+}

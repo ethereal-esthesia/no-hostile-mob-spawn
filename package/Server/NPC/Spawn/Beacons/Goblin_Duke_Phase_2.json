@@ -1,0 +1,23 @@
+{
+  "Environments": [],
+  "NPCs": [
+    {
+      "Weight": 1,
+      "Id": "NoHostileMobSpawn_Disabled_1ce6c859947d"
+    }
+  ],
+  "SpawnAfterGameTimeRange": [
+    "PT5M",
+    "PT10M"
+  ],
+  "MinDistanceFromPlayer": 2,
+  "MaxSpawnedNPCs": 5,
+  "ConcurrentSpawnsRange": [
+    1,
+    2
+  ],
+  "BeaconRadius": 6,
+  "SpawnRadius": 6,
+  "NPCSpawnState": "Chase",
+  "TargetSlot": "LockedTarget"
+}
