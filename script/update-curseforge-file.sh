@@ -12,6 +12,7 @@ CURSEFORGE_GAME_VERSION_ID="${CURSEFORGE_GAME_VERSION_ID:-}"
 source "$MOD_DIR/script/properties-lib.sh"
 
 hytale_version="$(property "$PROPERTIES_FILE" hytaleServerVersion)"
+mod_version="$(property "$PROPERTIES_FILE" modVersion)"
 hytale_game_version_id="${CURSEFORGE_GAME_VERSION_ID:-$(property "$PROPERTIES_FILE" hytaleGameVersionId)}"
 hytale_game_version_name="$(property "$PROPERTIES_FILE" hytaleGameVersionName)"
 
@@ -39,13 +40,36 @@ echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game
 
 metadata="$MOD_DIR/build/curseforge-update-metadata.json"
 mkdir -p "$MOD_DIR/build"
-python3 - "$metadata" "$CURSEFORGE_FILE_ID" "$hytale_game_version_id" <<'PY'
+python3 - "$metadata" "$CURSEFORGE_FILE_ID" "$hytale_game_version_id" "$mod_version" "$hytale_version" "$MOD_DIR/CHANGELOG.md" <<'PY'
 import json
+import re
 import sys
 from pathlib import Path
 
-path, file_id, game_version_id = sys.argv[1:]
+path, file_id, game_version_id, mod_version, hytale_version, changelog_path = sys.argv[1:]
+
+def changelog_for_version(path, version):
+    changelog = Path(path)
+    if not changelog.exists():
+        return f"Release {version} for Hytale {hytale_version}."
+
+    text = changelog.read_text()
+    pattern = re.compile(
+        rf"^##\s+{re.escape(version)}(?:\s+-\s+[^\n]*)?\n(?P<body>.*?)(?=^##\s+|\Z)",
+        re.MULTILINE | re.DOTALL,
+    )
+    match = pattern.search(text)
+    if not match:
+        return f"Release {version} for Hytale {hytale_version}."
+
+    body = match.group("body").strip()
+    if not body:
+        return f"Release {version} for Hytale {hytale_version}."
+    return f"## {version}\n\n{body}"
+
 metadata = {
+    "changelog": changelog_for_version(changelog_path, mod_version),
+    "changelogType": "markdown",
     "fileID": int(file_id),
     "gameVersions": [int(game_version_id)],
 }
