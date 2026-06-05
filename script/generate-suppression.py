@@ -425,6 +425,24 @@ def disabled_spawn_role_name(path):
     return f"NoHostileMobSpawn_Disabled_{digest}"
 
 
+def disabled_spawn_entry(source_entry, role_key, disabled_role_name):
+    entry = {
+        "Weight": SPAWN_PLACEHOLDER_WEIGHT,
+        role_key: disabled_role_name,
+    }
+
+    if isinstance(source_entry, dict):
+        for key in (
+            "SpawnAfterGameTime",
+            "SpawnBeforeGameTime",
+            "RealtimeRespawnTime",
+        ):
+            if key in source_entry:
+                entry[key] = source_entry[key]
+
+    return entry
+
+
 def filtered_spawn_documents(spawns, hostile_roles):
     hostile_role_set = set(hostile_roles)
     for path, document in spawns.items():
@@ -445,18 +463,15 @@ def filtered_spawn_documents(spawns, hostile_roles):
         disabled_role_name = ""
         if not kept:
             role_key = "Id"
+            source_entry = {}
             for entry in npcs:
                 if isinstance(entry, dict):
                     role_key = spawn_entry_role_key(entry)
+                    source_entry = entry
                     break
 
             disabled_role_name = disabled_spawn_role_name(path)
-            kept = [
-                {
-                    "Weight": SPAWN_PLACEHOLDER_WEIGHT,
-                    role_key: disabled_role_name,
-                }
-            ]
+            kept = [disabled_spawn_entry(source_entry, role_key, disabled_role_name)]
 
         filtered_document["NPCs"] = kept
 
