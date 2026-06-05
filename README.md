@@ -117,12 +117,19 @@ Required GitHub configuration:
 
 ```text
 Secret:   CURSEFORGE_API_TOKEN
+Secret:   CURSEFORGE_CORE_API_TOKEN (optional when CURSEFORGE_API_TOKEN also works with the Core API)
 Variable: CURSEFORGE_PROJECT_ID
 ```
 
-To retry the CurseForge upload for the current already-released version without
-creating another GitHub release, run the `Publish Current Version to CurseForge`
-workflow manually and type `publish`.
+After a successful CurseForge upload, the workflow records
+`curseforge-upload-v<modVersion>.json` on the matching GitHub release. The
+publish script also queries CurseForge's file API for the exact release jar name
+before uploading. The macOS and Linux release scripts use the same check when
+they run with `--push`, so they refuse to create and push a release pin if
+CurseForge already has that file. To intentionally upload another CurseForge file
+for the same version, run the manual `Publish Current Version to CurseForge`
+workflow, type `publish`, and type `republish` in the duplicate override field,
+or set `CURSEFORGE_ALLOW_DUPLICATE=republish` for a direct script run.
 
 ## License
 

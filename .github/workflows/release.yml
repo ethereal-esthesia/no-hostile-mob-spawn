@@ -31,9 +31,11 @@ jobs:
       - name: Validate CurseForge configuration
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: |
           test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
+          test -n "$CURSEFORGE_CORE_API_TOKEN" || { echo "Missing CURSEFORGE_CORE_API_TOKEN secret." >&2; exit 1; }
           test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
 
       - name: Read release version
@@ -52,6 +54,13 @@ jobs:
             echo "Tag ${{ steps.version.outputs.tag }} already exists." >&2
             exit 1
           fi
+
+      - name: Refuse duplicate CurseForge file
+        env:
+          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
+        run: ./script/check-curseforge-upload.sh
 
       - name: Build release artifact
         run: ./script/build-release.sh
@@ -72,5 +81,17 @@ jobs:
       - name: Publish to CurseForge
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
+          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: ./script/publish-curseforge.sh
+
+      - name: Record CurseForge upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          marker="build/curseforge-upload-v${VERSION}.json"
+          cp build/curseforge-upload-response.json "$marker"
+          gh release upload "$TAG" \
+            "$marker"
