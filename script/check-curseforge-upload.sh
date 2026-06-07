@@ -8,6 +8,7 @@ CURSEFORGE_API_TOKEN="${CURSEFORGE_API_TOKEN:-}"
 CURSEFORGE_CORE_API_TOKEN="${CURSEFORGE_CORE_API_TOKEN:-$CURSEFORGE_API_TOKEN}"
 CURSEFORGE_PROJECT_ID="${CURSEFORGE_PROJECT_ID:-}"
 CURSEFORGE_ALLOW_DUPLICATE="${CURSEFORGE_ALLOW_DUPLICATE:-}"
+CURSEFORGE_REQUIRE_DUPLICATE_CHECK="${CURSEFORGE_REQUIRE_DUPLICATE_CHECK:-0}"
 
 source "$MOD_DIR/script/properties-lib.sh"
 
@@ -129,6 +130,9 @@ case "$check_status" in
     exit 1
     ;;
   *)
-    exit 1
+    if [ "$CURSEFORGE_REQUIRE_DUPLICATE_CHECK" = "1" ]; then
+      exit 1
+    fi
+    echo "Warning: CurseForge duplicate check could not complete; continuing because CURSEFORGE_REQUIRE_DUPLICATE_CHECK is not 1." >&2
     ;;
 esac
