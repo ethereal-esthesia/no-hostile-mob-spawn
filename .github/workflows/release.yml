@@ -72,10 +72,12 @@ jobs:
           VERSION: ${{ steps.version.outputs.version }}
           HYTALE_VERSION: ${{ steps.version.outputs.hytale_version }}
         run: |
+          artifact="$(./script/artifact-name.sh path)"
+          display_name="$(./script/artifact-name.sh display-name)"
           gh release create "$TAG" \
-            build/libs/NoHostileMobSpawn-"$VERSION"-hytale-"$HYTALE_VERSION".jar \
+            "$artifact" \
             --target "$GITHUB_SHA" \
-            --title "NoHostileMobSpawn $VERSION for Hytale $HYTALE_VERSION" \
+            --title "$display_name" \
             --notes "Release $VERSION for Hytale $HYTALE_VERSION. All tests passed before publishing."
 
       - name: Publish to CurseForge

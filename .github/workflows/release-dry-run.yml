@@ -35,8 +35,7 @@ jobs:
       - name: Report release artifact
         run: |
           version="$(./script/project-version.sh)"
-          hytale_version="$(./script/hytale-version.sh)"
-          artifact="build/libs/NoHostileMobSpawn-${version}-hytale-${hytale_version}.jar"
+          artifact="$(./script/artifact-name.sh path)"
           test -f "$artifact"
           echo "Dry run passed."
           echo "Would create tag: v${version}"

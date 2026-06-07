@@ -3,6 +3,11 @@
 No Hostile Mob Spawn suppresses hostile mob spawns while leaving passive
 wildlife available.
 
+The public CurseForge/GitHub release artifact is branded as Elemental Harmony
+so players can recognize where the jar came from. The internal Hytale package
+name remains `NoHostileMobSpawn` for compatibility with existing server
+installs and generated assets.
+
 ## Layout
 
 - `package/` is the Hytale package payload copied into `Server/mods`.
@@ -13,7 +18,7 @@ wildlife available.
 - `script/smoke.sh` verifies the generated hostile group has not unexpectedly
   shrunk by more than 5% from the current baseline.
 - `script/build-release.sh` writes a jar-format release package named with the
-  mod version and pinned Hytale server version.
+  public Elemental Harmony title, mod version, and pinned Hytale server version.
 
 ## Build
 
@@ -68,7 +73,7 @@ Release metadata is pinned in `mod.properties`.
 The release artifact is written to:
 
 ```text
-build/libs/NoHostileMobSpawn-<modVersion>-hytale-<hytaleServerVersion>.jar
+build/libs/Elemental Harmony <modVersion> for Hytale <hytaleServerVersion>.jar
 ```
 
 Use `release-if-hytale-changed.sh` from a dev or prod checkout to update release

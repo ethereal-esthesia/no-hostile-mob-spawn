@@ -11,10 +11,7 @@ CURSEFORGE_ALLOW_DUPLICATE="${CURSEFORGE_ALLOW_DUPLICATE:-}"
 
 source "$MOD_DIR/script/properties-lib.sh"
 
-mod_version="$(property "$PROPERTIES_FILE" modVersion)"
-hytale_version="$(property "$PROPERTIES_FILE" hytaleServerVersion)"
-artifact_base_name="$(property "$PROPERTIES_FILE" artifactBaseName)"
-artifact_name="${artifact_base_name}-${mod_version}-hytale-${hytale_version}.jar"
+artifact_name="$("$MOD_DIR/script/artifact-name.sh" filename)"
 
 case "$CURSEFORGE_ALLOW_DUPLICATE" in
   1|true|TRUE|republish)

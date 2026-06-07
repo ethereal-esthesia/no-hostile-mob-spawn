@@ -14,9 +14,8 @@ mod_version="$(property "$PROPERTIES_FILE" modVersion)"
 hytale_version="$(property "$PROPERTIES_FILE" hytaleServerVersion)"
 hytale_game_version_id="$(property "$PROPERTIES_FILE" hytaleGameVersionId)"
 hytale_game_version_name="$(property "$PROPERTIES_FILE" hytaleGameVersionName)"
-artifact_base_name="$(property "$PROPERTIES_FILE" artifactBaseName)"
-project_slug="$(property "$PROPERTIES_FILE" curseForgeProjectSlug)"
-artifact="$MOD_DIR/build/libs/${artifact_base_name}-${mod_version}-hytale-${hytale_version}.jar"
+artifact="$("$MOD_DIR/script/artifact-name.sh" path)"
+artifact_display_name="$("$MOD_DIR/script/artifact-name.sh" display-name)"
 
 if [ -z "$CURSEFORGE_API_TOKEN" ]; then
   echo "CURSEFORGE_API_TOKEN is required to publish to CurseForge." >&2
@@ -45,19 +44,19 @@ echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game
 
 metadata="$MOD_DIR/build/curseforge-upload-metadata.json"
 mkdir -p "$MOD_DIR/build"
-python3 - "$metadata" "$mod_version" "$hytale_version" "$hytale_game_version_id" "$artifact_base_name" "$project_slug" "$CURSEFORGE_RELEASE_TYPE" <<'PY'
+python3 - "$metadata" "$mod_version" "$hytale_version" "$hytale_game_version_id" "$artifact_display_name" "$CURSEFORGE_RELEASE_TYPE" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path, mod_version, hytale_version, game_version_id, artifact_base_name, project_slug, release_type = sys.argv[1:]
+path, mod_version, hytale_version, game_version_id, artifact_display_name, release_type = sys.argv[1:]
 metadata = {
     "changelog": (
         f"Release {mod_version} for Hytale {hytale_version}. "
         "Smoke tests passed before publishing."
     ),
     "changelogType": "markdown",
-    "displayName": f"{artifact_base_name} {mod_version} for Hytale {hytale_version}",
+    "displayName": artifact_display_name,
     "gameVersions": [int(game_version_id)],
     "releaseType": release_type,
 }

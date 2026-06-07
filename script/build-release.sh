@@ -79,7 +79,7 @@ with (dest / "hytale-version.txt").open("w") as f:
     f.write(hytale_version + "\n")
 PY
 
-artifact="$LIBS_DIR/${artifact_base_name}-${mod_version}-hytale-${hytale_version}.jar"
+artifact="$("$MOD_SCRIPT_DIR/artifact-name.sh" path)"
 rm -f "$artifact"
 (
   cd "$STAGING_DIR"
