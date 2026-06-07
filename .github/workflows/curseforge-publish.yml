@@ -7,10 +7,6 @@ on:
         description: Type "publish" to publish the current modVersion to CurseForge.
         required: true
         type: string
-      allow_duplicate:
-        description: Type "republish" only when intentionally uploading another CurseForge file for this version.
-        required: false
-        type: string
 
 permissions:
   contents: write
@@ -52,7 +48,6 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
           VERSION: ${{ steps.version.outputs.version }}
-          ALLOW_DUPLICATE: ${{ inputs.allow_duplicate }}
         run: |
           mkdir -p build
           marker="curseforge-upload-v${VERSION}.json"
@@ -61,17 +56,12 @@ jobs:
             exit 0
           fi
 
-          if [ "$ALLOW_DUPLICATE" = "republish" ]; then
-            echo "GitHub release $TAG exists; proceeding because allow_duplicate=republish."
-            exit 0
-          fi
-
           if grep -Fx "$marker" build/release-assets.txt >/dev/null; then
             echo "CurseForge upload marker $marker already exists on $TAG." >&2
           else
             echo "GitHub release $TAG already exists, but it predates the CurseForge upload marker." >&2
           fi
-          echo "Refusing to upload another file for the same version. Type republish in allow_duplicate to override intentionally." >&2
+          echo "Refusing to upload another file for the same version." >&2
           exit 1
 
       - name: Build release artifact
@@ -82,7 +72,6 @@ jobs:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          CURSEFORGE_ALLOW_DUPLICATE: ${{ inputs.allow_duplicate }}
         run: ./script/check-curseforge-upload.sh
 
       - name: Publish to CurseForge
@@ -90,7 +79,6 @@ jobs:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-          CURSEFORGE_ALLOW_DUPLICATE: ${{ inputs.allow_duplicate }}
         run: ./script/publish-curseforge.sh
 
       - name: Record CurseForge upload

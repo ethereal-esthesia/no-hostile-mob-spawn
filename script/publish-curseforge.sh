@@ -51,10 +51,7 @@ from pathlib import Path
 
 path, mod_version, hytale_version, game_version_id, artifact_display_name, release_type = sys.argv[1:]
 metadata = {
-    "changelog": (
-        f"Release {mod_version} for Hytale {hytale_version}. "
-        "Smoke tests passed before publishing."
-    ),
+    "changelog": f"Release {mod_version} for Hytale {hytale_version}.\n\nRetested and updated version ID metadata.",
     "changelogType": "markdown",
     "displayName": artifact_display_name,
     "gameVersions": [int(game_version_id)],
