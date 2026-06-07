@@ -38,8 +38,6 @@ if [ ! -f "$artifact" ]; then
   exit 1
 fi
 
-"$MOD_DIR/script/check-curseforge-upload.sh"
-
 echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game_version_name:-Hytale $hytale_version}."
 
 metadata="$MOD_DIR/build/curseforge-upload-metadata.json"

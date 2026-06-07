@@ -29,11 +29,9 @@ jobs:
       - name: Validate CurseForge configuration
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: |
           test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
-          test -n "$CURSEFORGE_CORE_API_TOKEN" || { echo "Missing CURSEFORGE_CORE_API_TOKEN secret." >&2; exit 1; }
           test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
 
       - name: Read release version
@@ -52,32 +50,24 @@ jobs:
           mkdir -p build
           marker="curseforge-upload-v${VERSION}.json"
           if ! gh release view "$TAG" --json assets --jq '.assets[].name' > build/release-assets.txt; then
-            echo "GitHub release $TAG does not exist yet; continuing with CurseForge upload."
-            exit 0
+            echo "GitHub release $TAG does not exist yet; create the GitHub release before publishing to CurseForge." >&2
+            exit 1
           fi
 
           if grep -Fx "$marker" build/release-assets.txt >/dev/null; then
             echo "CurseForge upload marker $marker already exists on $TAG." >&2
+            echo "Refusing to upload another file for the same version." >&2
+            exit 1
           else
-            echo "GitHub release $TAG already exists, but it predates the CurseForge upload marker." >&2
+            echo "GitHub release $TAG exists and has no CurseForge upload marker; continuing."
           fi
-          echo "Refusing to upload another file for the same version." >&2
-          exit 1
 
       - name: Build release artifact
         run: ./script/build-release.sh
 
-      - name: Refuse duplicate CurseForge file
-        env:
-          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-        run: ./script/check-curseforge-upload.sh
-
       - name: Publish to CurseForge
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: ./script/publish-curseforge.sh
 

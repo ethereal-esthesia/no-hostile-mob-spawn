@@ -115,10 +115,6 @@ if git diff --quiet -- mod.properties package/package.json; then
   exit 0
 fi
 
-if [ "$push" -eq 1 ]; then
-  "$MOD_DIR/script/check-curseforge-upload.sh"
-fi
-
 if [ "$full_tests" -eq 1 ]; then
   "$MOD_DIR/script/test-all.sh"
 else

@@ -107,10 +107,13 @@ script:
 3. Builds the release artifact.
 4. Commits the new pin.
 5. Pushes the version-pin commit when `--push` is provided.
-6. Lets GitHub publish the jar from that version-change commit.
+6. Lets GitHub create a release from that version-change commit.
 
-Like the push publish workflow, the prod release script targets the commit where
-`modVersion` changed rather than whatever commit happens to be newest.
+Like the release workflow, the prod release script targets the commit where
+`modVersion` changed rather than whatever commit happens to be newest. By
+default, this creates a GitHub release only. Set repository variable
+`CURSEFORGE_AUTO_PUBLISH=1` only when version-change releases should also upload
+to CurseForge automatically.
 
 The CurseForge project page is:
 
@@ -122,19 +125,16 @@ Required GitHub configuration:
 
 ```text
 Secret:   CURSEFORGE_API_TOKEN
-Secret:   CURSEFORGE_CORE_API_TOKEN (optional when CURSEFORGE_API_TOKEN also works with the Core API)
 Variable: CURSEFORGE_PROJECT_ID
+Variable: CURSEFORGE_AUTO_PUBLISH=1 (optional; enables automatic CurseForge uploads from release workflows)
 ```
 
-After a successful CurseForge upload, the workflow records
-`curseforge-upload-v<modVersion>.json` on the matching GitHub release. The
-publish script also queries CurseForge's file API for the exact release jar name
-before uploading. The macOS and Linux release scripts use the same check when
-they run with `--push`, so they refuse to create and push a release pin if
-CurseForge already has that file. To intentionally upload another CurseForge file
-for the same version, run the manual `Publish Current Version to CurseForge`
-workflow, type `publish`, and type `republish` in the duplicate override field,
-or set `CURSEFORGE_ALLOW_DUPLICATE=republish` for a direct script run.
+To publish an already-created GitHub release to CurseForge, run the manual
+`Publish Current Version to CurseForge` workflow and type `publish`. The
+matching GitHub release must exist first. After a successful upload, the workflow
+records `curseforge-upload-v<modVersion>.json` on that release. If the marker
+already exists, later workflow runs fail before uploading another file for the
+same version.
 
 ## License
 

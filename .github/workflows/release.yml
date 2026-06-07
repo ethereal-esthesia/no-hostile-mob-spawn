@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       confirm_release:
-        description: Type "release" to publish the current modVersion.
+        description: Type "release" to create a GitHub release for the current modVersion.
         required: true
         type: string
 
@@ -29,13 +29,12 @@ jobs:
           java-version: '25'
 
       - name: Validate CurseForge configuration
+        if: vars.CURSEFORGE_AUTO_PUBLISH == '1'
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: |
           test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
-          test -n "$CURSEFORGE_CORE_API_TOKEN" || { echo "Missing CURSEFORGE_CORE_API_TOKEN secret." >&2; exit 1; }
           test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
 
       - name: Read release version
@@ -54,13 +53,6 @@ jobs:
             echo "Tag ${{ steps.version.outputs.tag }} already exists." >&2
             exit 1
           fi
-
-      - name: Refuse duplicate CurseForge file
-        env:
-          CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
-        run: ./script/check-curseforge-upload.sh
 
       - name: Build release artifact
         run: ./script/build-release.sh
@@ -81,13 +73,14 @@ jobs:
             --notes "Release $VERSION for Hytale $HYTALE_VERSION. All tests passed before publishing."
 
       - name: Publish to CurseForge
+        if: vars.CURSEFORGE_AUTO_PUBLISH == '1'
         env:
           CURSEFORGE_API_TOKEN: ${{ secrets.CURSEFORGE_API_TOKEN }}
-          CURSEFORGE_CORE_API_TOKEN: ${{ secrets.CURSEFORGE_CORE_API_TOKEN || secrets.CURSEFORGE_API_TOKEN }}
           CURSEFORGE_PROJECT_ID: ${{ vars.CURSEFORGE_PROJECT_ID }}
         run: ./script/publish-curseforge.sh
 
       - name: Record CurseForge upload
+        if: vars.CURSEFORGE_AUTO_PUBLISH == '1'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.version.outputs.tag }}
@@ -97,3 +90,7 @@ jobs:
           cp build/curseforge-upload-response.json "$marker"
           gh release upload "$TAG" \
             "$marker"
+
+      - name: CurseForge publish skipped
+        if: vars.CURSEFORGE_AUTO_PUBLISH != '1'
+        run: echo "CURSEFORGE_AUTO_PUBLISH is not 1; GitHub release created without publishing to CurseForge."
