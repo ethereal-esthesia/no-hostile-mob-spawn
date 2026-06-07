@@ -21,6 +21,26 @@ fail() {
   exit 1
 }
 
+notify_validation_needed() {
+  local mod_version="$1"
+  local hytale_version="$2"
+  local commit_sha="$3"
+  local notify_script="${HYTALE_MOD_VALIDATION_NOTIFY_SCRIPT:-$MOD_DIR/../../script/server/notify.sh}"
+  local message=""
+
+  if [ ! -x "$notify_script" ]; then
+    return 0
+  fi
+
+  if [ "$push" -eq 1 ]; then
+    message="Mod plugin version needs validation: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) was published."
+  else
+    message="Mod plugin version needs validation: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) is ready before publishing."
+  fi
+
+  "$notify_script" info "$message" >/dev/null 2>&1 || true
+}
+
 push=0
 full_tests=0
 check_ready=0
@@ -110,6 +130,7 @@ hytale_version="$(./script/hytale-version.sh)"
 
 git add mod.properties package/package.json
 git commit -m "Release $mod_version for Hytale $hytale_version"
+release_commit="$(git rev-parse --short HEAD)"
 
 echo "Created release pin commit:"
 git --no-pager log --oneline -1
@@ -117,7 +138,9 @@ git --no-pager log --oneline -1
 if [ "$push" -eq 1 ]; then
   git push origin HEAD:main
   echo "Pushed release pin update to main."
+  notify_validation_needed "$mod_version" "$hytale_version" "$release_commit"
 else
+  notify_validation_needed "$mod_version" "$hytale_version" "$release_commit"
   echo "Push skipped. Run this to publish:"
   echo "  git push origin HEAD:main"
 fi
