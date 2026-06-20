@@ -34,7 +34,7 @@ notify_validation_needed() {
   fi
 
   if [ "$push" -eq 1 ]; then
-    message="Mod plugin version needs CurseForge follow-up: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) was pushed. Test it on prod, then run the manual CurseForge publish workflow."
+    message="Mod plugin version needs validation: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) was pushed. Test it on prod, then run the manual CurseForge publish workflow."
   else
     message="Mod plugin version needs validation: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) is ready before publishing."
   fi
