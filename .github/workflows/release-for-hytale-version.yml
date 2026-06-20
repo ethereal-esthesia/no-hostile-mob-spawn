@@ -1,0 +1,119 @@
+name: Release for Hytale Version
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_release:
+        description: Type "release" to create a release for the requested Hytale version.
+        required: true
+        type: string
+      hytale_version:
+        description: Hytale server version to pin, for example 0.5.6.
+        required: true
+        type: string
+      mod_version:
+        description: Optional explicit mod version. Defaults to the next patch version when the Hytale pin changes.
+        required: false
+        type: string
+      hytale_game_version_id:
+        description: Optional CurseForge game version ID override.
+        required: false
+        type: string
+      hytale_game_version_name:
+        description: Optional CurseForge game version name override.
+        required: false
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && inputs.confirm_release == 'release'
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Update release metadata
+        id: update
+        env:
+          HYTALE_RELEASE_VERSION: ${{ inputs.hytale_version }}
+          HYTALE_GAME_VERSION_ID: ${{ inputs.hytale_game_version_id }}
+          HYTALE_GAME_VERSION_NAME: ${{ inputs.hytale_game_version_name }}
+          REQUESTED_MOD_VERSION: ${{ inputs.mod_version }}
+        run: |
+          args=(--hytale-version "$HYTALE_RELEASE_VERSION")
+          if [ -n "$REQUESTED_MOD_VERSION" ]; then
+            args+=(--mod-version "$REQUESTED_MOD_VERSION")
+          fi
+
+          ./script/update-to-latest-hytale.sh "${args[@]}"
+
+      - name: Read release version
+        id: version
+        run: |
+          version="$(./script/project-version.sh)"
+          hytale_version="$(./script/hytale-version.sh)"
+          tag="v${version}"
+          echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "hytale_version=${hytale_version}" >> "$GITHUB_OUTPUT"
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Check release tag
+        id: tag
+        run: |
+          if git rev-parse "${{ steps.version.outputs.tag }}" >/dev/null 2>&1; then
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: No release needed
+        if: steps.update.outputs.changed != 'true' && steps.tag.outputs.exists == 'true'
+        run: echo "Release metadata and tag ${{ steps.version.outputs.tag }} are already current for Hytale ${{ inputs.hytale_version }}."
+
+      - name: Refuse duplicate tag for changed metadata
+        if: steps.update.outputs.changed == 'true' && steps.tag.outputs.exists == 'true'
+        run: |
+          echo "Tag ${{ steps.version.outputs.tag }} already exists." >&2
+          exit 1
+
+      - name: Build release artifact
+        if: steps.update.outputs.changed == 'true' || steps.tag.outputs.exists != 'true'
+        run: ./script/build-release.sh
+
+      - name: Commit release metadata
+        if: steps.update.outputs.changed == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add mod.properties package/package.json
+          git commit -m "Release ${{ steps.version.outputs.version }} for Hytale ${{ steps.version.outputs.hytale_version }}"
+          git push origin HEAD:main
+
+      - name: Create GitHub release
+        if: steps.tag.outputs.exists != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          HYTALE_VERSION: ${{ steps.version.outputs.hytale_version }}
+        run: |
+          artifact="$(./script/artifact-name.sh path)"
+          display_name="$(./script/artifact-name.sh display-name)"
+          release_commit="$(git rev-parse HEAD)"
+          gh release create "$TAG" \
+            "$artifact" \
+            --target "$release_commit" \
+            --title "$display_name" \
+            --notes "Release $VERSION for Hytale $HYTALE_VERSION. Test this build on prod before publishing it to CurseForge."

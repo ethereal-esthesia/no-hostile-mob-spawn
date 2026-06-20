@@ -1,11 +1,19 @@
-name: Publish Current Version to CurseForge
+name: Publish Release to CurseForge
 
 on:
   workflow_dispatch:
     inputs:
       confirm_publish:
-        description: Type "publish" to publish the current modVersion to CurseForge.
+        description: Type "publish" to publish the requested modVersion to CurseForge.
         required: true
+        type: string
+      mod_version:
+        description: Mod release version to publish, for example 1.0.8.
+        required: true
+        type: string
+      hytale_version:
+        description: Optional Hytale version that the release must match, for example 0.5.6.
+        required: false
         type: string
 
 permissions:
@@ -19,6 +27,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -34,11 +44,38 @@ jobs:
           test -n "$CURSEFORGE_API_TOKEN" || { echo "Missing CURSEFORGE_API_TOKEN secret." >&2; exit 1; }
           test -n "$CURSEFORGE_PROJECT_ID" || { echo "Missing CURSEFORGE_PROJECT_ID repository variable." >&2; exit 1; }
 
-      - name: Read release version
+      - name: Check out requested release tag
         id: version
+        env:
+          REQUESTED_MOD_VERSION: ${{ inputs.mod_version }}
+          REQUESTED_HYTALE_VERSION: ${{ inputs.hytale_version }}
         run: |
+          requested="${REQUESTED_MOD_VERSION#v}"
+          case "$requested" in
+            ""|*[!0-9.]*|.*|*..*|*.)
+              echo "Invalid mod version: $REQUESTED_MOD_VERSION" >&2
+              exit 1
+              ;;
+          esac
+
+          tag="v${requested}"
+          git fetch origin "refs/tags/${tag}:refs/tags/${tag}"
+          git checkout --detach "$tag"
+
           version="$(./script/project-version.sh)"
+          hytale_version="$(./script/hytale-version.sh)"
+          if [ "$version" != "$requested" ]; then
+            echo "Requested mod version $requested, but $tag contains modVersion=$version." >&2
+            exit 1
+          fi
+
+          if [ -n "$REQUESTED_HYTALE_VERSION" ] && [ "$hytale_version" != "$REQUESTED_HYTALE_VERSION" ]; then
+            echo "Requested Hytale $REQUESTED_HYTALE_VERSION, but $tag is pinned to Hytale $hytale_version." >&2
+            exit 1
+          fi
+
           echo "version=${version}" >> "$GITHUB_OUTPUT"
+          echo "hytale_version=${hytale_version}" >> "$GITHUB_OUTPUT"
           echo "tag=v${version}" >> "$GITHUB_OUTPUT"
 
       - name: Refuse duplicate CurseForge upload

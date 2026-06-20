@@ -76,44 +76,41 @@ The release artifact is written to:
 build/libs/Elemental Harmony <modVersion> for Hytale <hytaleServerVersion>.jar
 ```
 
-Use `release-if-hytale-changed.sh` from a dev or prod checkout to update release
-pins. Automation runs it without a version argument, so it bumps the patch
-version only when the selected Hytale runtime changed. Manual runs can pass
-`--runtime-dir <dir>` to select a specific runtime and `--mod-version <version>`
-to choose the mod release version explicitly. The script builds the same release
-artifact that GitHub publishes; pass `--full-tests` when you also want the
-temporary server integration test. The publish workflow uses the commit where
-`modVersion` changed as the release target, so later non-version commits in the
-same push do not become the release artifact.
+Use the `Release for Hytale Version` GitHub workflow to update release pins from
+a known Hytale runtime version. The workflow patches `mod.properties` and
+`package/package.json`, bumps the patch version when needed, commits those
+release metadata changes with `GITHUB_TOKEN`, builds the release artifact, and
+creates the GitHub release.
+
+`release-if-hytale-changed.sh` remains available for local/manual release
+preparation from a checkout with an installed runtime, but production automation
+should dispatch the GitHub workflow rather than pushing commits from the server.
 
 ## Prod Hytale Releases
 
-Schedule release checks from any machine with an installed Hytale runtime rather
-than in GitHub Actions. The job reads the selected Hytale runtime version,
-updates this mod's release pin if needed, builds the release artifact, commits
-the pin update, and pushes it to GitHub.
+Schedule release checks from any machine with an installed Hytale runtime. The
+prod server reports the installed Hytale version to GitHub; GitHub Actions owns
+the release metadata commit and GitHub release artifact publication.
 
 ```bash
-./script/release-if-hytale-changed.sh --push
-./script/release-if-hytale-changed.sh --runtime-dir ~/dev/hytale-server/.local/hytale-game --push
-./script/release-if-hytale-changed.sh --mod-version 1.0.3 --push
+gh workflow run release-for-hytale-version.yml \
+  --repo ethereal-esthesia/no-hostile-mob-spawn \
+  --ref main \
+  -f confirm_release=release \
+  -f hytale_version=0.5.6
 ```
 
-If the selected runtime is newer than the pinned `hytaleServerVersion`, the
-script:
+If the requested Hytale version is newer than the pinned
+`hytaleServerVersion`, the workflow:
 
 1. Updates `mod.properties`.
 2. Bumps the mod patch version.
 3. Builds the release artifact.
-4. Commits the new pin.
-5. Pushes the version-pin commit when `--push` is provided.
-6. Lets GitHub create a release from that version-change commit.
+4. Commits the new release metadata.
+5. Creates the GitHub release.
 
-Like the release workflow, the prod release script targets the commit where
-`modVersion` changed rather than whatever commit happens to be newest. By
-default, this creates a GitHub release only. Set repository variable
-`CURSEFORGE_AUTO_PUBLISH=1` only when version-change releases should also upload
-to CurseForge automatically.
+This creates a GitHub release only. Test that build on prod before publishing it
+to CurseForge.
 
 The CurseForge project page is:
 
@@ -126,15 +123,26 @@ Required GitHub configuration:
 ```text
 Secret:   CURSEFORGE_API_TOKEN
 Variable: CURSEFORGE_PROJECT_ID
-Variable: CURSEFORGE_AUTO_PUBLISH=1 (optional; enables automatic CurseForge uploads from release workflows)
 ```
 
 To publish an already-created GitHub release to CurseForge, run the manual
-`Publish Current Version to CurseForge` workflow and type `publish`. The
-matching GitHub release must exist first. After a successful upload, the workflow
-records `curseforge-upload-v<modVersion>.json` on that release. If the marker
-already exists, later workflow runs fail before uploading another file for the
-same version.
+`Publish Release to CurseForge` workflow with the mod version you tested. The
+matching GitHub release must exist first, and the optional Hytale version input
+must match the release metadata.
+
+```bash
+gh workflow run curseforge-publish.yml \
+  --repo ethereal-esthesia/no-hostile-mob-spawn \
+  --ref main \
+  -f confirm_publish=publish \
+  -f mod_version=1.0.8 \
+  -f hytale_version=0.5.6
+```
+
+After a successful upload, the workflow records
+`curseforge-upload-v<modVersion>.json` on that release. If the marker already
+exists, later workflow runs fail before uploading another file for the same
+version.
 
 ## License
 

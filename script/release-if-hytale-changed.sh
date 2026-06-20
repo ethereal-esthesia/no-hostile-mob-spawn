@@ -29,16 +29,74 @@ notify_validation_needed() {
   local message=""
 
   if [ ! -x "$notify_script" ]; then
+    echo "NoHostileMobSpawn validation notice skipped; notify script is not executable: $notify_script" >&2
     return 0
   fi
 
   if [ "$push" -eq 1 ]; then
-    message="Mod plugin version needs validation: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) was published."
+    message="Mod plugin version needs CurseForge follow-up: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) was pushed. Test it on prod, then run the manual CurseForge publish workflow."
   else
     message="Mod plugin version needs validation: NoHostileMobSpawn $mod_version for Hytale $hytale_version ($commit_sha) is ready before publishing."
   fi
 
-  "$notify_script" info "$message" >/dev/null 2>&1 || true
+  "$notify_script" info "$message" >/dev/null || {
+    echo "NoHostileMobSpawn validation notice failed; continuing without blocking release." >&2
+  }
+}
+
+pending_release_pin_upstream=""
+pending_release_pin_ahead_count=0
+
+has_pending_release_pin_push() {
+  local upstream=""
+  local counts=""
+  local behind_count=""
+  local ahead_count=""
+
+  upstream="$(git rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)"
+  [ -n "$upstream" ] || return 1
+
+  counts="$(git rev-list --left-right --count "$upstream"...HEAD 2>/dev/null || true)"
+  [ -n "$counts" ] || return 1
+
+  read -r behind_count ahead_count <<<"$counts"
+  [ "${ahead_count:-0}" -gt 0 ] || return 1
+
+  if git diff --quiet "$upstream"..HEAD -- mod.properties package/package.json; then
+    return 1
+  fi
+
+  pending_release_pin_upstream="$upstream"
+  pending_release_pin_ahead_count="$ahead_count"
+  return 0
+}
+
+handle_pending_release_pin_push() {
+  local mod_version=""
+  local hytale_version=""
+  local release_commit=""
+
+  if ! has_pending_release_pin_push; then
+    return 1
+  fi
+
+  mod_version="$(./script/project-version.sh)"
+  hytale_version="$(./script/hytale-version.sh)"
+  release_commit="$(git rev-parse --short HEAD)"
+
+  if [ "$push" -eq 1 ]; then
+    git push origin HEAD:main
+    echo "Pushed pending release pin update to main."
+  else
+    echo "Release pin is already committed locally but not pushed."
+    echo "- Upstream: $pending_release_pin_upstream"
+    echo "- Pending commits: $pending_release_pin_ahead_count"
+    echo "Push skipped. Run this to publish:"
+    echo "  git push origin HEAD:main"
+  fi
+
+  notify_validation_needed "$mod_version" "$hytale_version" "$release_commit"
+  return 0
 }
 
 push=0
@@ -111,6 +169,9 @@ else
 fi
 
 if git diff --quiet -- mod.properties package/package.json; then
+  if handle_pending_release_pin_push; then
+    exit 0
+  fi
   echo "No Hytale release update needed."
   exit 0
 fi
