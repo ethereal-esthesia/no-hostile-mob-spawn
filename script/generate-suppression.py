@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 import csv
+import copy
 import fnmatch
 import hashlib
 import json
@@ -26,7 +27,9 @@ SPAWN_PLACEHOLDER_ROLE = "Bat"
 SPAWN_PLACEHOLDER_WEIGHT = 1
 MOB_DROPS_CSV_RELATIVE_PATH = Path("Reports/Mob_Drops.csv")
 MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH = Path("Reports/Mob_Only_Recipe_Items.csv")
+LEATHER_RECIPE_OVERRIDES_CSV_RELATIVE_PATH = Path("Reports/Leather_Recipe_Overrides.csv")
 ALWAYS_SUPPRESS = ["Aggressive", HOSTILE_GROUP_NAME]
+CRAFTING_RECIPE_TYPES = {"Crafting", "DiagramCrafting", "StructuralCrafting"}
 IGNORED_GROUPS = {
     "",
     "?",
@@ -54,6 +57,7 @@ def load_json_assets(assets_zip):
     roles = {}
     groups = {}
     drops = {}
+    items = {}
     recipes = {}
     spawns = {}
 
@@ -74,12 +78,14 @@ def load_json_assets(assets_zip):
                 groups.setdefault(path.stem, []).append((path, document))
             elif path.parts[:2] == ("Server", "Drops"):
                 drops[path] = document
+            elif path.parts[:3] == ("Server", "Item", "Items"):
+                items[path] = document
             elif path.parts[:3] == ("Server", "Item", "Recipes"):
                 recipes[path] = document
             elif path.parts[:3] == ("Server", "NPC", "Spawn"):
                 spawns[path] = document
 
-    return roles, groups, drops, recipes, spawns
+    return roles, groups, drops, items, recipes, spawns
 
 
 def collect_parameters(roles, role_name, seen=None):
@@ -320,6 +326,164 @@ def recipe_input_items(recipes):
     return item_recipes
 
 
+def as_list(value):
+    if isinstance(value, list):
+        return value
+    if isinstance(value, str):
+        return [value]
+    return []
+
+
+def leather_recipe_item_ids(items):
+    leather_item_ids = set()
+    for path, item in items.items():
+        item_id = path.stem
+        tags = item.get("Tags", {})
+        tag_type = as_list(tags.get("Type")) if isinstance(tags, dict) else []
+        tag_family = as_list(tags.get("Family")) if isinstance(tags, dict) else []
+
+        if item_id.startswith("Ingredient_Leather_") or (
+            "Ingredient" in tag_type and "Leather" in tag_family
+        ):
+            leather_item_ids.add(item_id)
+
+    return leather_item_ids
+
+
+def is_crafting_recipe(recipe):
+    requirements = recipe.get("BenchRequirement", [])
+    if not isinstance(requirements, list) or not requirements:
+        return True
+
+    requirement_types = {
+        requirement.get("Type", "")
+        for requirement in requirements
+        if isinstance(requirement, dict)
+    }
+    if requirement_types & CRAFTING_RECIPE_TYPES:
+        return True
+
+    return "Processing" not in requirement_types
+
+
+def recipe_input_item_id(input_item):
+    if isinstance(input_item, dict) and isinstance(input_item.get("ItemId"), str):
+        return input_item["ItemId"]
+
+    return ""
+
+
+def remove_leather_recipe_inputs(recipe, leather_item_ids):
+    inputs = recipe.get("Input", [])
+    if not isinstance(inputs, list) or not is_crafting_recipe(recipe):
+        return None
+
+    leather_inputs = [
+        input_item
+        for input_item in inputs
+        if recipe_input_item_id(input_item) in leather_item_ids
+    ]
+    if not leather_inputs:
+        return None
+
+    kept_inputs = [
+        input_item
+        for input_item in inputs
+        if recipe_input_item_id(input_item) not in leather_item_ids
+    ]
+    status = "modified" if kept_inputs else "all_leather_preserved"
+    if status != "modified":
+        return {
+            "recipe": recipe,
+            "status": status,
+            "removed_input_count": 0,
+            "leather_item_ids": sorted(
+                {recipe_input_item_id(input_item) for input_item in leather_inputs}
+            ),
+            "remaining_item_ids": [],
+        }
+
+    modified_recipe = copy.deepcopy(recipe)
+    modified_recipe["Input"] = kept_inputs
+    return {
+        "recipe": modified_recipe,
+        "status": status,
+        "removed_input_count": len(inputs) - len(kept_inputs),
+        "leather_item_ids": sorted(
+            {recipe_input_item_id(input_item) for input_item in leather_inputs}
+        ),
+        "remaining_item_ids": sorted(
+            {
+                recipe_input_item_id(input_item)
+                for input_item in kept_inputs
+                if recipe_input_item_id(input_item)
+            }
+        ),
+    }
+
+
+def leather_recipe_scan_rows(items, recipes, leather_item_ids):
+    for path, recipe in recipes.items():
+        result = remove_leather_recipe_inputs(recipe, leather_item_ids)
+        if not result:
+            continue
+
+        yield {
+            "path": path,
+            "document": result["recipe"],
+            "source_type": "standalone_recipe",
+            **result,
+        }
+
+    for path, item in items.items():
+        recipe = item.get("Recipe")
+        if not isinstance(recipe, dict):
+            continue
+
+        result = remove_leather_recipe_inputs(recipe, leather_item_ids)
+        if not result:
+            continue
+
+        document = item
+        if result["status"] == "modified":
+            document = copy.deepcopy(item)
+            document["Recipe"] = result["recipe"]
+
+        yield {
+            "path": path,
+            "document": document,
+            "source_type": "embedded_item_recipe",
+            **result,
+        }
+
+
+def write_leather_recipe_overrides_csv(rows, path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fieldnames = [
+        "source_type",
+        "status",
+        "path",
+        "removed_input_count",
+        "leather_item_ids",
+        "remaining_item_ids",
+    ]
+
+    with path.open("w", newline="") as f:
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(
+                {
+                    "source_type": row["source_type"],
+                    "status": row["status"],
+                    "path": str(row["path"]),
+                    "removed_input_count": row["removed_input_count"],
+                    "leather_item_ids": ";".join(row["leather_item_ids"]),
+                    "remaining_item_ids": ";".join(row["remaining_item_ids"]),
+                }
+            )
+
+
 def dropped_items_by_source(drops):
     non_mob_items = set()
 
@@ -489,9 +653,14 @@ def main():
         print(f"Error: Assets.zip not found: {assets_zip}", file=sys.stderr)
         return 1
 
-    roles, groups, drops, recipes, spawns = load_json_assets(assets_zip)
+    roles, groups, drops, items, recipes, spawns = load_json_assets(assets_zip)
     hostile_roles = generated_hostile_roles(roles, groups)
     spawn_documents = list(filtered_spawn_documents(spawns, hostile_roles))
+    leather_item_ids = leather_recipe_item_ids(items)
+    leather_recipe_rows = list(leather_recipe_scan_rows(items, recipes, leather_item_ids))
+    leather_recipe_documents = [
+        row for row in leather_recipe_rows if row["status"] == "modified"
+    ]
     hostile_group_path = package_dest / HOSTILE_GROUP_RELATIVE_PATH
     suppression_paths = [package_dest / path for path in SUPPRESSION_RELATIVE_PATHS]
     world_suppressor_paths = [
@@ -499,6 +668,9 @@ def main():
     ]
     mob_drops_csv_path = package_dest / MOB_DROPS_CSV_RELATIVE_PATH
     mob_only_recipe_items_csv_path = package_dest / MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH
+    leather_recipe_overrides_csv_path = (
+        package_dest / LEATHER_RECIPE_OVERRIDES_CSV_RELATIVE_PATH
+    )
     hostile_group_path.parent.mkdir(parents=True, exist_ok=True)
     for generated_path in suppression_paths + world_suppressor_paths:
         generated_path.parent.mkdir(parents=True, exist_ok=True)
@@ -570,6 +742,13 @@ def main():
             json.dump(spawn_document, f, indent=2)
             f.write("\n")
 
+    for row in leather_recipe_documents:
+        output_path = package_dest / row["path"]
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        with output_path.open("w") as f:
+            json.dump(row["document"], f, indent=2)
+            f.write("\n")
+
     print(
         f"Generated NoHostileMobSpawn hostile role group: "
         f"{HOSTILE_GROUP_NAME} ({len(hostile_roles)} roles)"
@@ -609,6 +788,23 @@ def main():
         f"Generated mob-only recipe item CSV: {MOB_ONLY_RECIPE_ITEMS_CSV_RELATIVE_PATH} "
         f"({item_count} items, {missing_item_count} missing, "
         f"{preserved_item_count} preserved)"
+    )
+    write_leather_recipe_overrides_csv(
+        leather_recipe_rows,
+        leather_recipe_overrides_csv_path,
+    )
+    removed_leather_input_count = sum(
+        row["removed_input_count"] for row in leather_recipe_documents
+    )
+    preserved_all_leather_count = sum(
+        1 for row in leather_recipe_rows if row["status"] == "all_leather_preserved"
+    )
+    print(
+        f"Generated leather-free recipe overrides: "
+        f"{len(leather_recipe_documents)} assets, "
+        f"{removed_leather_input_count} leather inputs removed, "
+        f"{preserved_all_leather_count} all-leather recipes preserved, "
+        f"{len(leather_item_ids)} leather item types detected"
     )
     return 0
 

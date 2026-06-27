@@ -33,6 +33,7 @@ suppression="$package_dest/Server/NPC/Spawn/Suppression/No_Hostile_Mob_Spawn.jso
 legacy_suppression="$package_dest/Server/NPC/Spawn/Suppression/Peaceful_No_Hostiles.json"
 mob_drops_csv="$package_dest/Reports/Mob_Drops.csv"
 mob_only_recipe_items_csv="$package_dest/Reports/Mob_Only_Recipe_Items.csv"
+leather_recipe_overrides_csv="$package_dest/Reports/Leather_Recipe_Overrides.csv"
 default_world_suppression="$package_dest/Server/Instances/Defaults/Default/resources/SpawnSuppressionController.json"
 
 if [ -n "$assets_zip" ] && [ -f "$assets_zip" ]; then
@@ -44,6 +45,7 @@ else
   legacy_suppression="$package_dest/Server/NPC/Spawn/Suppression/Peaceful_No_Hostiles.json"
   mob_drops_csv="$package_dest/Reports/Mob_Drops.csv"
   mob_only_recipe_items_csv="$package_dest/Reports/Mob_Only_Recipe_Items.csv"
+  leather_recipe_overrides_csv="$package_dest/Reports/Leather_Recipe_Overrides.csv"
   default_world_suppression="$package_dest/Server/Instances/Defaults/Default/resources/SpawnSuppressionController.json"
   echo "Assets.zip not found; validating checked-in package payload."
 fi
@@ -66,6 +68,10 @@ fi
 
 if [ ! -f "$mob_only_recipe_items_csv" ]; then
   fail "generated mob-only recipe item CSV is missing: $mob_only_recipe_items_csv"
+fi
+
+if [ ! -f "$leather_recipe_overrides_csv" ]; then
+  fail "generated leather recipe override CSV is missing: $leather_recipe_overrides_csv"
 fi
 
 if [ ! -f "$default_world_suppression" ]; then
@@ -157,6 +163,69 @@ for path in spawn_paths:
         if role_name in hostile_roles:
             print(f"{path}: still references hostile role {role_name}", file=sys.stderr)
             raise SystemExit(1)
+PY
+
+python3 - "$leather_recipe_overrides_csv" "$package_dest" <<'PY'
+import csv
+import json
+import sys
+from pathlib import Path
+
+report_path = Path(sys.argv[1])
+package_dest = Path(sys.argv[2])
+with report_path.open(newline="") as f:
+    rows = list(csv.DictReader(f))
+
+modified_rows = [row for row in rows if row.get("status") == "modified"]
+if len(modified_rows) < 50:
+    print(
+        f"{report_path}: expected at least 50 leather recipe overrides, "
+        f"found {len(modified_rows)}",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
+
+leather_prefix = "Ingredient_Leather_"
+for row in modified_rows:
+    override_path = package_dest / row["path"]
+    if not override_path.is_file():
+        print(f"{override_path}: expected generated leather recipe override", file=sys.stderr)
+        raise SystemExit(1)
+
+    with override_path.open() as f:
+        document = json.load(f)
+
+    recipe = document if row.get("source_type") == "standalone_recipe" else document.get("Recipe", {})
+    inputs = recipe.get("Input", [])
+    for item in inputs:
+        if isinstance(item, dict) and item.get("ItemId", "").startswith(leather_prefix):
+            print(f"{override_path}: leather input was not removed", file=sys.stderr)
+            raise SystemExit(1)
+PY
+
+python3 - "$MOD_SCRIPT_DIR/generate-suppression.py" <<'PY'
+import importlib.util
+import sys
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+script_path = Path(sys.argv[1])
+spec = importlib.util.spec_from_file_location("generate_suppression", script_path)
+module = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(module)
+
+result = module.remove_leather_recipe_inputs(
+    {
+        "Input": [
+            {"ItemId": "Ingredient_Leather_Light", "Quantity": 1},
+            {"ItemId": "Ingredient_Leather_Heavy", "Quantity": 1},
+        ]
+    },
+    {"Ingredient_Leather_Light", "Ingredient_Leather_Heavy"},
+)
+if not result or result["status"] != "all_leather_preserved":
+    print("all-leather recipe inputs should be preserved", file=sys.stderr)
+    raise SystemExit(1)
 PY
 
 echo "NoHostileMobSpawn smoke test passed: $count hostile roles (minimum $MIN_HOSTILE_ROLE_COUNT)."

@@ -15,6 +15,8 @@ installs and generated assets.
   the `NoHostileMobSpawn_Hostiles` NPC group, and writes the suppression config.
   It also writes the legacy `Peaceful_No_Hostiles` suppression ID so worlds
   previously run with the old package can load persisted spawn markers.
+  The same scan removes leather ingredient requirements from craft recipes when
+  another ingredient remains, and reports those overrides under `Reports/`.
 - `script/smoke.sh` verifies the generated hostile group has not unexpectedly
   shrunk by more than 5% from the current baseline.
 - `script/build-release.sh` writes a jar-format release package named with the

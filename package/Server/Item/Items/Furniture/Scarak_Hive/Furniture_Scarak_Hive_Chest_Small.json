@@ -1,0 +1,141 @@
+{
+  "TranslationProperties": {
+    "Name": "server.items.Furniture_Scarak_Hive_Chest_Small.name"
+  },
+  "PlayerAnimationsId": "Block",
+  "Categories": [
+    "Furniture.Containers"
+  ],
+  "Set": "Furniture_Jungle",
+  "Recipe": {
+    "KnowledgeRequired": false,
+    "Input": [
+      {
+        "ItemId": "Ingredient_Chitin_Sturdy",
+        "Quantity": 3
+      },
+      {
+        "ItemId": "Ingredient_Bar_Thorium",
+        "Quantity": 2
+      }
+    ],
+    "BenchRequirement": [
+      {
+        "Type": "Crafting",
+        "Id": "Furniture_Bench",
+        "Categories": [
+          "Furniture_Storage"
+        ]
+      }
+    ],
+    "RequiredMemoriesLevel": 5
+  },
+  "IconProperties": {
+    "Rotation": [
+      22.5,
+      45,
+      22.5
+    ],
+    "Scale": 0.55,
+    "Translation": [
+      0,
+      -15
+    ]
+  },
+  "BlockType": {
+    "BlockParticleSetId": "Stone",
+    "BlockSoundSetId": "Bone",
+    "PhysicalMaterialId": "Wood",
+    "CustomModel": "Blocks/Decorative_Sets/Scarak_Hive/Chest_Small.blockymodel",
+    "CustomModelTexture": [
+      {
+        "Texture": "Blocks/Decorative_Sets/Scarak_Hive/Chest_Small_Texture.png",
+        "Weight": 1
+      }
+    ],
+    "DrawType": "Model",
+    "Flags": {
+      "IsUsable": true
+    },
+    "Gathering": {
+      "Breaking": {
+        "GatherType": "Woods"
+      }
+    },
+    "Material": "Solid",
+    "Opacity": "Transparent",
+    "ParticleColor": "#d36c42",
+    "ConnectedBlockRuleSet": {
+      "Type": "CustomTemplate",
+      "TemplateShapeAssetId": "ChestConnectedBlockTemplate",
+      "TemplateShapeBlockPatterns": {
+        "Default": "Furniture_Scarak_Hive_Chest_Small",
+        "Double": "Furniture_Scarak_Hive_Chest_Large"
+      }
+    },
+    "State": {
+      "Definitions": {
+        "CloseWindow": {
+          "InteractionSoundEventId": "SFX_Egg_Hit",
+          "CustomModelAnimation": "Blocks/Decorative_Sets/Scarak_Hive/Chest_Small_Close.blockyanim",
+          "Looping": false
+        },
+        "OpenWindow": {
+          "InteractionSoundEventId": "SFX_Egg_Hit",
+          "CustomModelAnimation": "Blocks/Decorative_Sets/Scarak_Hive/Chest_Small_Open.blockyanim",
+          "Looping": false
+        }
+      }
+    },
+    "BlockEntity": {
+      "Components": {
+        "ItemContainerBlock": {
+          "Capacity": 18
+        }
+      }
+    },
+    "Supporting": {
+      "Up": [
+        {
+          "FaceType": "Full"
+        }
+      ]
+    },
+    "Support": {
+      "Down": [
+        {
+          "FaceType": "Full"
+        }
+      ]
+    },
+    "VariantRotation": "NESW",
+    "InteractionHint": "server.interactionHints.openDoor",
+    "Interactions": {
+      "Use": "Open_Container"
+    },
+    "CustomModelAnimation": "Blocks/Decorative_Sets/Scarak_Hive/Chest_Small_Idle.blockyanim",
+    "Looping": true,
+    "TextureComputedColor": "#733C2F"
+  },
+  "ResourceTypes": [
+    {
+      "Id": "Fuel"
+    },
+    {
+      "Id": "Charcoal"
+    }
+  ],
+  "Tags": {
+    "Type": [
+      "Furniture"
+    ],
+    "Family": [
+      "Jungle"
+    ]
+  },
+  "$Comment": " ",
+  "Icon": "Icons/ItemsGenerated/Furniture_Scarak_Hive_Chest_Small.png",
+  "ItemSoundSetId": "ISS_Blocks_Wood",
+  "ItemLevel": 19,
+  "MaxStack": 25
+}
