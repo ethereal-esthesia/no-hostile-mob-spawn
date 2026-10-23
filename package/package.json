@@ -1,6 +1,6 @@
 {
   "Group": "Codex",
   "Name": "NoHostileMobSpawn",
-  "Version": "1.0.23",
+  "Version": "1.0.24",
   "Description": "Suppresses hostile mob spawns while leaving passive wildlife available."
 }
