@@ -38,6 +38,28 @@ default_world_suppression="$package_dest/Server/Instances/Defaults/Default/resou
 
 if [ -n "$assets_zip" ] && [ -f "$assets_zip" ]; then
   "$MOD_SCRIPT_DIR/generate-suppression.py" "$assets_zip" "$package_dest" >/dev/null
+  python3 - "$assets_zip" "$MOD_DIR/package" <<'PY'
+import sys
+import zipfile
+from pathlib import Path
+
+assets_zip = Path(sys.argv[1])
+package_dir = Path(sys.argv[2])
+spawn_root = package_dir / "Server" / "NPC" / "Spawn"
+with zipfile.ZipFile(assets_zip) as stock_assets:
+    stock_paths = set(stock_assets.namelist())
+
+orphans = [
+    path.relative_to(package_dir).as_posix()
+    for path in spawn_root.rglob("*.json")
+    if "/Suppression/" not in path.relative_to(package_dir).as_posix()
+    and path.relative_to(package_dir).as_posix() not in stock_paths
+]
+if orphans:
+    for path in sorted(orphans):
+        print(f"{path}: checked-in spawn override is absent from Assets.zip", file=sys.stderr)
+    raise SystemExit(1)
+PY
 else
   package_dest="$MOD_DIR/package"
   hostile_group="$package_dest/Server/NPC/Groups/NoHostileMobSpawn_Hostiles.json"

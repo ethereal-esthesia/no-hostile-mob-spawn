@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import importlib.util
 import sys
+import tempfile
 import unittest
 from pathlib import Path, PurePosixPath
 
@@ -92,6 +93,34 @@ class HostileRoleClassificationTests(unittest.TestCase):
             entries[0]["Name"].startswith("NoHostileMobSpawn_Disabled_")
         )
         self.assertEqual(entries[0]["SpawnAfterGameTime"], "P1D")
+
+    def test_prune_removes_orphaned_spawn_overrides_and_keeps_suppression(self):
+        stock_path = PurePosixPath(
+            "Server/NPC/Spawn/Markers/Goblin.json"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            package_dest = Path(directory)
+            spawn_root = package_dest / "Server" / "NPC" / "Spawn"
+            stock_file = package_dest / stock_path
+            orphan_file = spawn_root / "Markers" / "Spawn_Void.json"
+            suppression_file = (
+                spawn_root / "Suppression" / "No_Hostile_Mob_Spawn.json"
+            )
+            stock_file.parent.mkdir(parents=True)
+            orphan_file.parent.mkdir(parents=True, exist_ok=True)
+            suppression_file.parent.mkdir(parents=True)
+            stock_file.write_text("{}\n")
+            orphan_file.write_text("{}\n")
+            suppression_file.write_text("{}\n")
+
+            removed = GENERATOR.prune_orphaned_spawn_documents(
+                package_dest, {stock_path: {}}
+            )
+
+            self.assertEqual(removed, 1)
+            self.assertTrue(stock_file.is_file())
+            self.assertFalse(orphan_file.exists())
+            self.assertTrue(suppression_file.is_file())
 
 
 if __name__ == "__main__":

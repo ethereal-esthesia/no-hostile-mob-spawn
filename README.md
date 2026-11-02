@@ -14,7 +14,8 @@ installs and generated assets.
 - `script/generate-suppression.py` scans the installed `Assets.zip`, generates
   the `NoHostileMobSpawn_Hostiles` NPC group, and writes the suppression config.
   Roles included by NPC groups under `Groups/.../Aggressive/` are treated as
-  hostile, respecting each group's `ExcludeRoles` patterns.
+  hostile, respecting each group's `ExcludeRoles` patterns. It removes stale
+  spawn overrides that no longer exist in the installed `Assets.zip`.
   It also writes the legacy `Peaceful_No_Hostiles` suppression ID so worlds
   previously run with the old package can load persisted spawn markers.
   The same scan removes leather ingredient requirements from craft recipes when

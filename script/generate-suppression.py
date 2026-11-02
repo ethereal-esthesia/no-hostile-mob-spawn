@@ -678,6 +678,25 @@ def filtered_spawn_documents(spawns, hostile_roles):
         yield path, filtered_document, removed_count, len(npcs), disabled_role_name
 
 
+def prune_orphaned_spawn_documents(package_dest, spawns):
+    spawn_root = package_dest / "Server" / "NPC" / "Spawn"
+    stock_spawn_paths = {path.as_posix() for path in spawns}
+    removed = 0
+
+    if not spawn_root.is_dir():
+        return removed
+
+    for path in spawn_root.rglob("*.json"):
+        relative_path = path.relative_to(package_dest).as_posix()
+        if "/Suppression/" in relative_path or relative_path in stock_spawn_paths:
+            continue
+
+        path.unlink()
+        removed += 1
+
+    return removed
+
+
 def main():
     if len(sys.argv) != 3:
         print("usage: generate-suppression.py ASSETS_ZIP PACKAGE_DEST", file=sys.stderr)
@@ -690,6 +709,10 @@ def main():
         return 1
 
     roles, groups, drops, items, recipes, spawns = load_json_assets(assets_zip)
+    removed_orphaned_spawns = prune_orphaned_spawn_documents(package_dest, spawns)
+    if removed_orphaned_spawns:
+        print(f"Removed {removed_orphaned_spawns} obsolete spawn override(s)")
+
     hostile_roles = generated_hostile_roles(roles, groups)
     spawn_documents = list(filtered_spawn_documents(spawns, hostile_roles))
     leather_item_ids = leather_recipe_item_ids(items)
