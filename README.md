@@ -13,12 +13,15 @@ installs and generated assets.
 - `package/` is the Hytale package payload copied into `Server/mods`.
 - `script/generate-suppression.py` scans the installed `Assets.zip`, generates
   the `NoHostileMobSpawn_Hostiles` NPC group, and writes the suppression config.
+  Roles included by NPC groups under `Groups/.../Aggressive/` are treated as
+  hostile, respecting each group's `ExcludeRoles` patterns.
   It also writes the legacy `Peaceful_No_Hostiles` suppression ID so worlds
   previously run with the old package can load persisted spawn markers.
   The same scan removes leather ingredient requirements from craft recipes when
   another ingredient remains, and reports those overrides under `Reports/`.
 - `script/smoke.sh` verifies the generated hostile group has not unexpectedly
-  shrunk by more than 5% from the current baseline.
+  shrunk by more than 5% from the current baseline and checks key hostile spawn
+  overrides, including the Goblin Thief marker.
 - `script/build-release.sh` writes a jar-format release package named with the
   public Elemental Harmony title, mod version, and pinned Hytale server version.
 

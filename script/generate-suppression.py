@@ -170,12 +170,44 @@ def group_role_patterns(groups):
     return patterns
 
 
+def aggressive_group_patterns(groups):
+    patterns = []
+    for documents in groups.values():
+        for path, document in documents:
+            if "Aggressive" not in path.parts:
+                continue
+            if any(part in IGNORED_GROUP_PATH_PARTS for part in path.parts):
+                continue
+
+            include_roles = document.get("IncludeRoles", [])
+            if isinstance(include_roles, str):
+                include_roles = [include_roles]
+            exclude_roles = document.get("ExcludeRoles", [])
+            if isinstance(exclude_roles, str):
+                exclude_roles = [exclude_roles]
+
+            includes = [pattern for pattern in include_roles if isinstance(pattern, str)]
+            excludes = [pattern for pattern in exclude_roles if isinstance(pattern, str)]
+            if includes:
+                patterns.append((includes, excludes))
+
+    return patterns
+
+
 def matching_groups(role_name, patterns):
     return {
         group_name
         for group_name, group_patterns in patterns.items()
         if any(fnmatch.fnmatchcase(role_name, pattern) for pattern in group_patterns)
     }
+
+
+def matches_aggressive_group(role_name, patterns):
+    return any(
+        any(fnmatch.fnmatchcase(role_name, pattern) for pattern in includes)
+        and not any(fnmatch.fnmatchcase(role_name, pattern) for pattern in excludes)
+        for includes, excludes in patterns
+    )
 
 
 def contains_attack_instruction(value):
@@ -188,7 +220,7 @@ def contains_attack_instruction(value):
     return False
 
 
-def is_hostile_spawn_role(role_name, role, params, patterns):
+def is_hostile_spawn_role(role_name, role, params, patterns, aggressive_patterns):
     attitude_group = role.get("AttitudeGroup")
     role_groups = matching_groups(role_name, patterns)
     has_hostile_group = (
@@ -199,6 +231,7 @@ def is_hostile_spawn_role(role_name, role, params, patterns):
     has_direct_attack = bool(role.get("Attack") or params.get("Attack") or role.get("_CombatConfig"))
     has_nested_attack = contains_attack_instruction(role)
     default_hostile = role.get("DefaultPlayerAttitude") == "Hostile"
+    in_aggressive_group = matches_aggressive_group(role_name, aggressive_patterns)
 
     return (
         default_hostile and (has_direct_attack or has_hostile_group)
@@ -206,11 +239,12 @@ def is_hostile_spawn_role(role_name, role, params, patterns):
         has_direct_attack and has_hostile_group
     ) or (
         has_nested_attack and bool(role_groups & {"Void"})
-    )
+    ) or in_aggressive_group
 
 
 def generated_hostile_roles(roles, groups):
     patterns = group_role_patterns(groups)
+    aggressive_patterns = aggressive_group_patterns(groups)
     hostile_roles = []
     for role_name in roles:
         if role_name.startswith(("Template_", "Component_", "Test_")):
@@ -218,7 +252,9 @@ def generated_hostile_roles(roles, groups):
 
         role = resolve_role(roles, role_name)
         params = collect_parameters(roles, role_name)
-        if not is_hostile_spawn_role(role_name, role, params, patterns):
+        if not is_hostile_spawn_role(
+            role_name, role, params, patterns, aggressive_patterns
+        ):
             continue
 
         hostile_roles.append(role_name)

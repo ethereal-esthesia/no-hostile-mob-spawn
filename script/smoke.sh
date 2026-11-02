@@ -140,12 +140,19 @@ if len(spawn_paths) < 100:
 required_paths = [
     spawn_root / "World" / "Void" / "Tier1_Night_NPC1.json",
     spawn_root / "Markers" / "Intelligent" / "Goblin" / "Goblin.json",
-    spawn_root / "Beacons" / "Zone1" / "Zone1_Cave" / "Zone1_Cave_Goblin.json",
+    spawn_root / "Markers" / "Intelligent" / "Goblin" / "Goblin_Thief.json",
 ]
 for path in required_paths:
     if not path.is_file():
         print(f"{path}: expected hostile spawn override is missing", file=sys.stderr)
         raise SystemExit(1)
+
+if "Goblin_Thief" not in hostile_roles:
+    print(
+        f"{hostile_group_path}: Goblin_Thief is missing from the hostile role group",
+        file=sys.stderr,
+    )
+    raise SystemExit(1)
 
 for path in spawn_paths:
     with path.open() as f:

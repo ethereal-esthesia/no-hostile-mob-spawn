@@ -37,6 +37,7 @@ if [ "$package_version" != "$mod_version" ]; then
   exit 1
 fi
 
+python3 "$MOD_SCRIPT_DIR/test-hostile-role-classification.py"
 "$MOD_SCRIPT_DIR/smoke.sh"
 
 rm -rf "$STAGING_DIR"

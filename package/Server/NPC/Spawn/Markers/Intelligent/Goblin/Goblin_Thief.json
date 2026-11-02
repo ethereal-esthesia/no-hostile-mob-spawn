@@ -3,7 +3,8 @@
   "NPCs": [
     {
       "Weight": 1,
-      "Name": "NoHostileMobSpawn_Disabled_bfd8fc6ce7cd"
+      "Name": "NoHostileMobSpawn_Disabled_bfd8fc6ce7cd",
+      "SpawnAfterGameTime": "P1D"
     }
   ],
   "ExclusionRadius": 10,
