@@ -38,6 +38,7 @@ if [ "$package_version" != "$mod_version" ]; then
 fi
 
 python3 "$MOD_SCRIPT_DIR/test-hostile-role-classification.py"
+python3 "$MOD_SCRIPT_DIR/test-curseforge-changelog.py"
 "$MOD_SCRIPT_DIR/smoke.sh"
 
 rm -rf "$STAGING_DIR"

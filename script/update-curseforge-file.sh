@@ -45,35 +45,17 @@ fi
 
 metadata="$MOD_DIR/build/curseforge-update-metadata.json"
 mkdir -p "$MOD_DIR/build"
-python3 - "$metadata" "$CURSEFORGE_FILE_ID" "$hytale_game_version_id" "$mod_version" "$hytale_version" "$MOD_DIR/CHANGELOG.md" "$CURSEFORGE_CHANGELOG_ONLY" <<'PY'
+python3 - "$metadata" "$CURSEFORGE_FILE_ID" "$hytale_game_version_id" "$mod_version" "$hytale_version" "$MOD_DIR/CHANGELOG.md" "$CURSEFORGE_CHANGELOG_ONLY" "$MOD_DIR/script" <<'PY'
 import json
-import re
 import sys
-from pathlib import Path
 
-path, file_id, game_version_id, mod_version, hytale_version, changelog_path, changelog_only = sys.argv[1:]
+sys.path.insert(0, sys.argv[8])
+from curseforge_changelog import changelog_for_version
 
-def changelog_for_version(path, version):
-    changelog = Path(path)
-    if not changelog.exists():
-        return f"Release {version} for Hytale {hytale_version}."
-
-    text = changelog.read_text()
-    pattern = re.compile(
-        rf"^##\s+{re.escape(version)}(?:\s+-\s+[^\n]*)?\n(?P<body>.*?)(?=^##\s+|\Z)",
-        re.MULTILINE | re.DOTALL,
-    )
-    match = pattern.search(text)
-    if not match:
-        return f"Release {version} for Hytale {hytale_version}."
-
-    body = match.group("body").strip()
-    if not body:
-        return f"Release {version} for Hytale {hytale_version}."
-    return f"## {version}\n\n{body}"
+path, file_id, game_version_id, mod_version, hytale_version, changelog_path, changelog_only, _ = sys.argv[1:]
 
 metadata = {
-    "changelog": changelog_for_version(changelog_path, mod_version),
+    "changelog": changelog_for_version(changelog_path, mod_version, hytale_version),
     "changelogType": "markdown",
     "fileID": int(file_id),
 }

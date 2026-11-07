@@ -42,14 +42,17 @@ echo "Using CurseForge game version ID $hytale_game_version_id for ${hytale_game
 
 metadata="$MOD_DIR/build/curseforge-upload-metadata.json"
 mkdir -p "$MOD_DIR/build"
-python3 - "$metadata" "$mod_version" "$hytale_version" "$hytale_game_version_id" "$artifact_display_name" "$CURSEFORGE_RELEASE_TYPE" <<'PY'
+python3 - "$metadata" "$mod_version" "$hytale_version" "$hytale_game_version_id" "$artifact_display_name" "$CURSEFORGE_RELEASE_TYPE" "$MOD_DIR/CHANGELOG.md" "$MOD_DIR/script" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path, mod_version, hytale_version, game_version_id, artifact_display_name, release_type = sys.argv[1:]
+sys.path.insert(0, sys.argv[8])
+from curseforge_changelog import changelog_for_version
+
+path, mod_version, hytale_version, game_version_id, artifact_display_name, release_type, changelog_path, _ = sys.argv[1:]
 metadata = {
-    "changelog": f"Release {mod_version} for Hytale {hytale_version}.\n\nRetested and updated version ID metadata.",
+    "changelog": changelog_for_version(changelog_path, mod_version, hytale_version),
     "changelogType": "markdown",
     "displayName": artifact_display_name,
     "gameVersions": [int(game_version_id)],
