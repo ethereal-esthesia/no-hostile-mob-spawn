@@ -219,8 +219,9 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
-import com.hypixel.hytale.server.core.universe.world.chunk.BlockChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.ChunkColumn;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
+import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
 import com.hypixel.hytale.server.core.universe.world.npc.INonPlayerCharacter;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
@@ -233,6 +234,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -253,45 +255,55 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
         int centerX = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_X", 33);
         int centerZ = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_Z", 8);
         int radius = Math.max(0, intEnv("NO_HOSTILE_TEST_CHUNK_RADIUS", 4));
-        world.execute(() -> forceLoadChunks(world, centerX, centerZ, radius));
-    }
+        List<CompletableFuture<Ref<ChunkStore>>> futures = new ArrayList<>();
 
-    private void forceLoadChunks(
-            World world,
-            int centerX,
-            int centerZ,
-            int radius) {
-        try {
-            List<WorldChunk> chunks = new ArrayList<>();
-            for (int x = centerX - radius; x <= centerX + radius; x++) {
-                for (int z = centerZ - radius; z <= centerZ + radius; z++) {
-                    WorldChunk chunk = world.getChunk(ChunkUtil.indexChunk(x, z));
-                    if (chunk == null) {
-                        throw new IllegalStateException("could not load chunk " + x + "," + z);
-                    }
-                    chunks.add(chunk);
-                }
+        for (int x = centerX - radius; x <= centerX + radius; x++) {
+            for (int z = centerZ - radius; z <= centerZ + radius; z++) {
+                futures.add(world.getChunkStore().getChunkReferenceAsync(ChunkUtil.indexChunk(x, z)));
             }
-
-            keepLoadedAndTicking(world, centerX, centerZ, radius, chunks);
-            runManualSpawnProbe(world);
-        } catch (Exception exception) {
-            getLogger().at(Level.SEVERE).withCause(exception)
-                    .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
         }
+
+        CompletableFuture
+                .allOf(futures.toArray(CompletableFuture[]::new))
+                .thenRun(() -> world.execute(() -> {
+                    try {
+                        Store<ChunkStore> store = world.getChunkStore().getStore();
+                        List<WorldChunk> chunks = new ArrayList<>();
+                        for (CompletableFuture<Ref<ChunkStore>> future : futures) {
+                            Ref<ChunkStore> reference = future.getNow(null);
+                            WorldChunk chunk = reference == null
+                                    ? null
+                                    : store.getComponent(reference, WorldChunk.getComponentType());
+                            if (chunk == null) {
+                                throw new IllegalStateException("loaded chunk has no world component");
+                            }
+                            chunks.add(chunk);
+                        }
+
+                        keepLoadedAndTicking(world, store, centerX, centerZ, radius, chunks);
+                        runManualSpawnProbe(world);
+                    } catch (Exception exception) {
+                        getLogger().at(Level.SEVERE).withCause(exception)
+                                .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
+                    }
+                }))
+                .exceptionally(throwable -> {
+                    getLogger().at(Level.SEVERE).withCause(throwable)
+                            .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
+                    return null;
+                });
     }
 
     private void keepLoadedAndTicking(
             World world,
+            Store<ChunkStore> store,
             int centerX,
             int centerZ,
             int radius,
             List<WorldChunk> chunks) {
-        Store<ChunkStore> chunkStore = world.getChunkStore().getStore();
-
         for (WorldChunk chunk : chunks) {
             chunk.addKeepLoaded();
-            forceBlockTicks(chunkStore, chunk);
+            forceBlockTicks(store, chunk);
         }
 
         getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Force-loaded " + chunks.size()
@@ -404,15 +416,28 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
     }
 
     private static void forceBlockTicks(Store<ChunkStore> store, WorldChunk chunk) {
-        BlockChunk blockChunk = store.getComponent(chunk.getReference(), BlockChunk.getComponentType());
-        if (blockChunk == null) {
-            throw new IllegalStateException("chunk has no block data: " + chunk.getX() + "," + chunk.getZ());
+        ChunkColumn column = store.getComponent(chunk.getReference(), ChunkColumn.getComponentType());
+        if (column == null) {
+            throw new IllegalStateException("chunk has no section column: " + chunk.getX() + "," + chunk.getZ());
         }
 
-        for (int x = 0; x < ChunkUtil.SIZE; x++) {
-            for (int y = 0; y < ChunkUtil.HEIGHT; y++) {
-                for (int z = 0; z < ChunkUtil.SIZE; z++) {
-                    blockChunk.setTicking(x, y, z, true);
+        Ref<ChunkStore>[] sections = column.getSections();
+        for (int sectionIndex = 0; sectionIndex < sections.length; sectionIndex++) {
+            Ref<ChunkStore> sectionRef = sections[sectionIndex];
+            if (sectionRef == null) {
+                continue;
+            }
+
+            BlockSection section = store.getComponent(sectionRef, BlockSection.getComponentType());
+            if (section == null) {
+                continue;
+            }
+
+            for (int x = 0; x < ChunkUtil.SIZE; x++) {
+                for (int y = 0; y < ChunkUtil.SIZE; y++) {
+                    for (int z = 0; z < ChunkUtil.SIZE; z++) {
+                        section.setTicking(x, y, z, true);
+                    }
                 }
             }
         }
