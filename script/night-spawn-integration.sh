@@ -256,10 +256,13 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
         int centerZ = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_Z", 8);
         int radius = Math.max(0, intEnv("NO_HOSTILE_TEST_CHUNK_RADIUS", 4));
         List<CompletableFuture<Ref<ChunkStore>>> futures = new ArrayList<>();
+        List<Long> chunkIndices = new ArrayList<>();
 
         for (int x = centerX - radius; x <= centerX + radius; x++) {
             for (int z = centerZ - radius; z <= centerZ + radius; z++) {
-                futures.add(world.getChunkStore().getChunkReferenceAsync(ChunkUtil.indexChunk(x, z)));
+                long index = ChunkUtil.indexChunk(x, z);
+                chunkIndices.add(index);
+                futures.add(world.getChunkStore().getChunkReferenceAsync(index));
             }
         }
 
@@ -267,15 +270,15 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
                 .allOf(futures.toArray(CompletableFuture[]::new))
                 .thenRun(() -> world.execute(() -> {
                     try {
+                        ChunkStore chunksStore = world.getChunkStore();
                         Store<ChunkStore> store = world.getChunkStore().getStore();
                         List<WorldChunk> chunks = new ArrayList<>();
-                        for (CompletableFuture<Ref<ChunkStore>> future : futures) {
-                            Ref<ChunkStore> reference = future.getNow(null);
-                            WorldChunk chunk = reference == null
-                                    ? null
-                                    : store.getComponent(reference, WorldChunk.getComponentType());
+                        for (long index : chunkIndices) {
+                            WorldChunk chunk = chunksStore.getChunkComponent(index, WorldChunk.getComponentType());
                             if (chunk == null) {
-                                throw new IllegalStateException("loaded chunk has no world component");
+                                throw new IllegalStateException(
+                                        "loaded chunk is no longer available: " + ChunkUtil.xOfChunkIndex(index)
+                                                + "," + ChunkUtil.zOfChunkIndex(index));
                             }
                             chunks.add(chunk);
                         }
