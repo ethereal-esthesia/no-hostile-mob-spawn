@@ -528,8 +528,8 @@ cat >"$server_dir/config.json" <<'EOF'
     "Type": "Hytale"
   },
   "AuthCredentialStore": {
-    "Type": "Json",
-    "Path": "auth.json"
+    "Type": "Encrypted",
+    "Path": "auth.enc"
   },
   "Update": {},
   "Backup": {},
@@ -645,7 +645,7 @@ with package_json.open() as f:
 version = ""
 if version_file and version_file.exists():
     marker = version_file.read_text().strip()
-    version = marker.split(":", 1)[1] if marker.startswith("hytale:") else marker
+    version = marker.removeprefix("hytale:").split(":", 1)[0]
 
 def server_version_range(value):
     if value.startswith(("=", "^", "~")) or value.endswith(".x"):
