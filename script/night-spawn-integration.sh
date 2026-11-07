@@ -256,7 +256,7 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
 
         for (int x = centerX - radius; x <= centerX + radius; x++) {
             for (int z = centerZ - radius; z <= centerZ + radius; z++) {
-                futures.add(world.getChunkAsync(ChunkUtil.indexChunk(x, z)));
+                futures.add(world.getChunkAsync(x, z));
             }
         }
 
@@ -405,7 +405,7 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
         for (int x = 0; x < ChunkUtil.SIZE; x++) {
             for (int y = 0; y < ChunkUtil.HEIGHT; y++) {
                 for (int z = 0; z < ChunkUtil.SIZE; z++) {
-                    chunk.setTicking(x, y, z, true);
+                    chunk.getBlockChunk().setTicking(x, y, z, true);
                 }
             }
         }
