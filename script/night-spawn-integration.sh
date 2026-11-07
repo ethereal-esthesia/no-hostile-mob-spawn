@@ -219,9 +219,11 @@ import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
 import com.hypixel.hytale.server.core.universe.Universe;
 import com.hypixel.hytale.server.core.universe.world.World;
+import com.hypixel.hytale.server.core.universe.world.chunk.BlockChunk;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
 import com.hypixel.hytale.server.core.universe.world.npc.INonPlayerCharacter;
+import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 import com.hypixel.hytale.server.npc.NPCPlugin;
 import it.unimi.dsi.fastutil.Pair;
@@ -231,7 +233,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -252,25 +253,32 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
         int centerX = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_X", 33);
         int centerZ = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_Z", 8);
         int radius = Math.max(0, intEnv("NO_HOSTILE_TEST_CHUNK_RADIUS", 4));
-        List<CompletableFuture<WorldChunk>> futures = new ArrayList<>();
+        world.execute(() -> forceLoadChunks(world, centerX, centerZ, radius));
+    }
 
-        for (int x = centerX - radius; x <= centerX + radius; x++) {
-            for (int z = centerZ - radius; z <= centerZ + radius; z++) {
-                futures.add(world.getChunkAsync(x, z));
+    private void forceLoadChunks(
+            World world,
+            int centerX,
+            int centerZ,
+            int radius) {
+        try {
+            List<WorldChunk> chunks = new ArrayList<>();
+            for (int x = centerX - radius; x <= centerX + radius; x++) {
+                for (int z = centerZ - radius; z <= centerZ + radius; z++) {
+                    WorldChunk chunk = world.getChunk(ChunkUtil.indexChunk(x, z));
+                    if (chunk == null) {
+                        throw new IllegalStateException("could not load chunk " + x + "," + z);
+                    }
+                    chunks.add(chunk);
+                }
             }
-        }
 
-        CompletableFuture
-                .allOf(futures.toArray(CompletableFuture[]::new))
-                .thenRun(() -> world.execute(() -> {
-                    keepLoadedAndTicking(world, centerX, centerZ, radius, futures);
-                    runManualSpawnProbe(world);
-                }))
-                .exceptionally(throwable -> {
-                    getLogger().at(Level.SEVERE).withCause(throwable)
-                            .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
-                    return null;
-                });
+            keepLoadedAndTicking(world, centerX, centerZ, radius, chunks);
+            runManualSpawnProbe(world);
+        } catch (Exception exception) {
+            getLogger().at(Level.SEVERE).withCause(exception)
+                    .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
+        }
     }
 
     private void keepLoadedAndTicking(
@@ -278,21 +286,15 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
             int centerX,
             int centerZ,
             int radius,
-            List<CompletableFuture<WorldChunk>> futures) {
-        int loaded = 0;
+            List<WorldChunk> chunks) {
+        Store<ChunkStore> chunkStore = world.getChunkStore().getStore();
 
-        for (CompletableFuture<WorldChunk> future : futures) {
-            WorldChunk chunk = future.getNow(null);
-            if (chunk == null) {
-                continue;
-            }
-
+        for (WorldChunk chunk : chunks) {
             chunk.addKeepLoaded();
-            forceBlockTicks(chunk);
-            loaded++;
+            forceBlockTicks(chunkStore, chunk);
         }
 
-        getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Force-loaded " + loaded
+        getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Force-loaded " + chunks.size()
                 + " chunks around " + centerX + "," + centerZ
                 + " radius " + radius + " in world " + world.getName() + ".");
     }
@@ -401,11 +403,16 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
         return roles;
     }
 
-    private static void forceBlockTicks(WorldChunk chunk) {
+    private static void forceBlockTicks(Store<ChunkStore> store, WorldChunk chunk) {
+        BlockChunk blockChunk = store.getComponent(chunk.getReference(), BlockChunk.getComponentType());
+        if (blockChunk == null) {
+            throw new IllegalStateException("chunk has no block data: " + chunk.getX() + "," + chunk.getZ());
+        }
+
         for (int x = 0; x < ChunkUtil.SIZE; x++) {
             for (int y = 0; y < ChunkUtil.HEIGHT; y++) {
                 for (int z = 0; z < ChunkUtil.SIZE; z++) {
-                    chunk.getBlockChunk().setTicking(x, y, z, true);
+                    blockChunk.setTicking(x, y, z, true);
                 }
             }
         }
