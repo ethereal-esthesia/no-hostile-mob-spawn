@@ -132,19 +132,16 @@ Secret:   CURSEFORGE_API_TOKEN
 Variable: CURSEFORGE_PROJECT_ID
 ```
 
-To publish an already-created GitHub release to CurseForge, run the manual
-`Publish Release to CurseForge` workflow with the mod version you tested. The
-matching GitHub release must exist first, and the optional Hytale version input
-must match the release metadata.
+After testing a release, publish it to CurseForge with:
 
 ```bash
-gh workflow run curseforge-publish.yml \
-  --repo ethereal-esthesia/no-hostile-mob-spawn \
-  --ref main \
-  -f confirm_publish=publish \
-  -f mod_version=1.0.8 \
-  -f hytale_version=0.5.6
+./mods/NoHostileMobSpawn/script/publish-tested-release.sh 1.0.26
 ```
+
+The script checks that the GitHub release and JAR exist and that the release
+has not already been uploaded, then dispatches the `Publish Release to
+CurseForge` workflow. The workflow validates its metadata and credentials before
+uploading.
 
 After a successful upload, the workflow records
 `curseforge-upload-v<modVersion>.json` on that release. If the marker already
