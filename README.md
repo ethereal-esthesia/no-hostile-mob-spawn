@@ -48,24 +48,25 @@ The repo build step installs this subproject into
 Override `BASELINE_HOSTILE_ROLE_COUNT` when intentionally updating the hostile
 scan baseline.
 
-## Manual Spawn Integration Test
+## Suppression Integration Test
 
 ```bash
 ./mods/NoHostileMobSpawn/script/night-spawn-integration.sh 1777943887064
 ```
 
-This starts an isolated temporary server, pins the default world to the given
-seed, force-loads and ticks a square chunk area, then manually spawns every role
-in `NoHostileMobSpawn_Hostiles` plus every preserved mob role from
-`Reports/Mob_Drops.csv` at one coordinate. Each entity's transform is checked
-before it is removed and the next role is tested. The default force-loaded area
-is centered on chunk `33,8` with radius `4`; override it with
+This starts an isolated temporary server using the installed Hytale runtime,
+validates every generated spawn override against the source assets, then checks
+that the runtime loaded the suppression asset and world suppressor. It verifies
+that the runtime's spawn-marker suppression logic rejects a confirmed hostile
+probe (`Bear_Grizzly`) but allows a preserved-role probe, and that live markers
+in the test area contain no hostile spawn options. The isolated test world is
+seeded from the generated default-world suppression resource. The default
+force-loaded area is centered on chunk `33,8` with radius `4`; override it with
 `HYTALE_NIGHT_SPAWN_CENTER_CHUNK_X`, `HYTALE_NIGHT_SPAWN_CENTER_CHUNK_Z`, and
 `HYTALE_NIGHT_SPAWN_CHUNK_RADIUS`.
 
-The default spawn coordinate is `1062,80,283`; override it with
-`HYTALE_NIGHT_SPAWN_SPAWN_X`, `HYTALE_NIGHT_SPAWN_SPAWN_Y`, and
-`HYTALE_NIGHT_SPAWN_SPAWN_Z`.
+Set `HYTALE_NIGHT_SPAWN_SOURCE_RUNTIME` to use a specific runtime root instead
+of `SERVER_DIRECTORY`.
 
 ## Release
 

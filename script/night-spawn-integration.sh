@@ -11,7 +11,7 @@ if [ -f "$REPO_ROOT/script/common.sh" ]; then
 fi
 
 fail() {
-  echo "NoHostileMobSpawn manual spawn integration test failed: $*" >&2
+  echo "NoHostileMobSpawn suppression integration test failed: $*" >&2
   exit 1
 }
 
@@ -36,9 +36,9 @@ usage() {
   cat >&2 <<EOF
 Usage: $0 [seed]
 
-Starts a temporary Hytale server, force-loads the target chunk, then manually
-spawns each suppressed role and each preserved mob role at one coordinate. Each
-spawn is verified at that coordinate and removed before the next role is tested.
+Starts an isolated temporary Hytale server, validates every generated hostile
+spawn override, then verifies that the runtime applies suppression to hostile
+spawn-marker configurations while allowing a preserved-role probe.
 
 Environment:
   HYTALE_NIGHT_SPAWN_SEED             Seed when [seed] is omitted.
@@ -48,11 +48,6 @@ Environment:
   HYTALE_NIGHT_SPAWN_CENTER_CHUNK_X    Center chunk X to force-load. Default: 33.
   HYTALE_NIGHT_SPAWN_CENTER_CHUNK_Z    Center chunk Z to force-load. Default: 8.
   HYTALE_NIGHT_SPAWN_CHUNK_RADIUS      Chunk radius around center to force-load. Default: 4.
-  HYTALE_NIGHT_SPAWN_SPAWN_X           Manual spawn test X. Default: 1062.
-  HYTALE_NIGHT_SPAWN_SPAWN_Y           Manual spawn test Y. Default: 80.
-  HYTALE_NIGHT_SPAWN_SPAWN_Z           Manual spawn test Z. Default: 283.
-  HYTALE_NIGHT_SPAWN_POSITION_TOLERANCE
-                                      Maximum position delta. Default: 0.01.
   HYTALE_NIGHT_SPAWN_BIND             Bind address. Default: 127.0.0.1:15520.
   HYTALE_NIGHT_SPAWN_KEEP_WORK_DIR    Set to 1 to keep the temp runtime.
   HYTALE_NIGHT_SPAWN_SOURCE_RUNTIME   Runtime root to clone. Default: SERVER_DIRECTORY.
@@ -70,10 +65,6 @@ force_load_seconds="${HYTALE_NIGHT_SPAWN_FORCE_LOAD_SECONDS:-120}"
 center_chunk_x="${HYTALE_NIGHT_SPAWN_CENTER_CHUNK_X:-33}"
 center_chunk_z="${HYTALE_NIGHT_SPAWN_CENTER_CHUNK_Z:-8}"
 chunk_radius="${HYTALE_NIGHT_SPAWN_CHUNK_RADIUS:-4}"
-spawn_x="${HYTALE_NIGHT_SPAWN_SPAWN_X:-1062}"
-spawn_y="${HYTALE_NIGHT_SPAWN_SPAWN_Y:-80}"
-spawn_z="${HYTALE_NIGHT_SPAWN_SPAWN_Z:-283}"
-position_tolerance="${HYTALE_NIGHT_SPAWN_POSITION_TOLERANCE:-0.01}"
 bind_address="${HYTALE_NIGHT_SPAWN_BIND:-127.0.0.1:15520}"
 keep_work_dir="${HYTALE_NIGHT_SPAWN_KEEP_WORK_DIR:-0}"
 source_runtime="${HYTALE_NIGHT_SPAWN_SOURCE_RUNTIME:-$SERVER_DIRECTORY}"
@@ -88,10 +79,6 @@ source_server_aot="$source_server_dir/HytaleServer.aot"
 [[ "$center_chunk_x" =~ ^-?[0-9]+$ ]] || fail "center chunk X must be an integer: $center_chunk_x"
 [[ "$center_chunk_z" =~ ^-?[0-9]+$ ]] || fail "center chunk Z must be an integer: $center_chunk_z"
 [[ "$chunk_radius" =~ ^[0-9]+$ ]] || fail "chunk radius must be an integer: $chunk_radius"
-[[ "$spawn_x" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || fail "spawn X must be a number: $spawn_x"
-[[ "$spawn_y" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || fail "spawn Y must be a number: $spawn_y"
-[[ "$spawn_z" =~ ^-?[0-9]+([.][0-9]+)?$ ]] || fail "spawn Z must be a number: $spawn_z"
-[[ "$position_tolerance" =~ ^[0-9]+([.][0-9]+)?$ ]] || fail "position tolerance must be a number: $position_tolerance"
 
 [ -f "$source_assets_zip" ] || fail "Assets.zip not found: $source_assets_zip"
 [ -f "$source_server_jar" ] || fail "HytaleServer.jar not found: $source_server_jar"
@@ -210,10 +197,9 @@ build_chunk_loader_plugin() {
 package com.etherealesthesia.hytale.nohostilemobspawn.test;
 
 import com.hypixel.hytale.math.util.ChunkUtil;
-import com.hypixel.hytale.math.vector.Rotation3f;
 import com.hypixel.hytale.component.Ref;
-import com.hypixel.hytale.component.RemoveReason;
 import com.hypixel.hytale.component.Store;
+import com.hypixel.hytale.component.query.Query;
 import com.hypixel.hytale.server.core.modules.entity.component.TransformComponent;
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
 import com.hypixel.hytale.server.core.plugin.JavaPluginInit;
@@ -223,17 +209,23 @@ import com.hypixel.hytale.server.core.universe.world.chunk.ChunkColumn;
 import com.hypixel.hytale.server.core.universe.world.chunk.WorldChunk;
 import com.hypixel.hytale.server.core.universe.world.chunk.section.BlockSection;
 import com.hypixel.hytale.server.core.universe.world.events.AllWorldsLoadedEvent;
-import com.hypixel.hytale.server.core.universe.world.npc.INonPlayerCharacter;
 import com.hypixel.hytale.server.core.universe.world.storage.ChunkStore;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
+import com.hypixel.hytale.server.spawning.assets.spawnmarker.config.SpawnMarker;
+import com.hypixel.hytale.server.spawning.assets.spawnsuppression.SpawnSuppression;
+import com.hypixel.hytale.server.spawning.spawnmarkers.SpawnMarkerEntity;
+import com.hypixel.hytale.server.spawning.suppression.SpawnSuppressorEntry;
+import com.hypixel.hytale.server.spawning.suppression.component.SpawnSuppressionController;
 import com.hypixel.hytale.server.npc.NPCPlugin;
-import it.unimi.dsi.fastutil.Pair;
 
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.logging.Level;
 import java.util.regex.Matcher;
@@ -309,103 +301,162 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
                     getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Force-loaded " + totalChunkCount
                             + " chunks around " + centerX + "," + centerZ
                             + " radius " + radius + " in world " + world.getName() + ".");
-                    runManualSpawnProbe(world);
+                    verifySpawnSuppression(world, centerX, centerZ, radius);
                 }, world)
                 .exceptionally(throwable -> {
                     getLogger().at(Level.SEVERE).withCause(throwable)
-                            .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
+                            .log("[NoHostileMobSpawnTest] Runtime suppression integration test failed.");
                     return null;
                 });
     }
 
-    private void runManualSpawnProbe(World world) {
+    private void verifySpawnSuppression(World world, int centerX, int centerZ, int radius) {
         List<String> suppressedRoles;
         List<String> preservedRoles;
         try {
             suppressedRoles = readRoles(Path.of(requiredEnv("NO_HOSTILE_TEST_ROLES_FILE")));
             preservedRoles = readRoles(Path.of(requiredEnv("NO_HOSTILE_TEST_PRESERVED_ROLES_FILE")));
         } catch (Exception exception) {
-            failManualProbe("could not read role list: " + exception.getMessage(), exception);
-            return;
+            throw new IllegalStateException("could not read generated role lists", exception);
         }
 
-        Vector3d expected = new Vector3d(
-                doubleEnv("NO_HOSTILE_TEST_SPAWN_X", 1062.0),
-                doubleEnv("NO_HOSTILE_TEST_SPAWN_Y", 80.0),
-                doubleEnv("NO_HOSTILE_TEST_SPAWN_Z", 283.0));
-        Rotation3f rotation = new Rotation3f(0.0f, 0.0f, 0.0f);
-        double tolerance = doubleEnv("NO_HOSTILE_TEST_POSITION_TOLERANCE", 0.01);
-        Store<EntityStore> store = world.getEntityStore().getStore();
-        int suppressedCount = probeRoles("suppressed", suppressedRoles, store, expected, rotation, tolerance);
-        if (suppressedCount < 0) {
-            return;
+        Set<String> suppressedRoleSet = new HashSet<>(suppressedRoles);
+        Set<String> overlappingRoles = new HashSet<>(suppressedRoleSet);
+        overlappingRoles.retainAll(preservedRoles);
+        if (!overlappingRoles.isEmpty()) {
+            throw new IllegalStateException("roles are both suppressed and preserved: " + overlappingRoles);
+        }
+        if (!suppressedRoleSet.contains("Bear_Grizzly")) {
+            throw new IllegalStateException("confirmed hostile role Bear_Grizzly is missing from the suppression group");
         }
 
-        int preservedCount = probeRoles("preserved", preservedRoles, store, expected, rotation, tolerance);
-        if (preservedCount < 0) {
-            return;
+        NPCPlugin npcPlugin = NPCPlugin.get();
+        for (String role : suppressedRoles) {
+            if (npcPlugin.getIndex(role) < 0) {
+                throw new IllegalStateException("suppressed role is missing from the runtime: " + role);
+            }
         }
-
-        getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Manual spawn probe passed: tested "
-                + suppressedCount + " suppressed roles and " + preservedCount
-                + " preserved mob roles at " + expected + ".");
-    }
-
-    private int probeRoles(
-            String label,
-            List<String> roles,
-            Store<EntityStore> store,
-            Vector3d expected,
-            Rotation3f rotation,
-            double tolerance) {
-        int tested = 0;
-
-        for (String role : roles) {
-            Pair<Ref<EntityStore>, INonPlayerCharacter> spawned = null;
-            Ref<EntityStore> ref = null;
-
-            try {
-                spawned = NPCPlugin.get().spawnNPC(store, role, null, expected, rotation);
-                if (spawned == null || spawned.first() == null || !spawned.first().isValid()) {
-                    failManualProbe(label + " role did not spawn: " + role, null);
-                    return -1;
-                }
-
-                ref = spawned.first();
-                TransformComponent transform = store.getComponent(ref, TransformComponent.getComponentType());
-                if (transform == null) {
-                    failManualProbe("spawned " + label + " role has no transform: " + role, null);
-                    return -1;
-                }
-
-                Vector3d actual = transform.getPosition();
-                if (actual == null || actual.distance(expected) > tolerance) {
-                    failManualProbe("spawned " + label + " role moved or spawned at the wrong position: " + role
-                            + " expected=" + expected + " actual=" + actual, null);
-                    return -1;
-                }
-
-                tested++;
-            } catch (Exception exception) {
-                failManualProbe("exception while spawning " + label + " role: " + role
-                        + ": " + exception.getMessage(), exception);
-                return -1;
-            } finally {
-                if (ref != null && ref.isValid()) {
-                    store.removeEntity(ref, RemoveReason.REMOVE);
-                }
+        for (String role : preservedRoles) {
+            if (npcPlugin.getIndex(role) < 0) {
+                throw new IllegalStateException("preserved role is missing from the runtime: " + role);
             }
         }
 
-        return tested;
+        SpawnSuppression suppression =
+                SpawnSuppression.getAssetMap().getAsset("No_Hostile_Mob_Spawn");
+        if (suppression == null) {
+            throw new IllegalStateException("runtime did not load No_Hostile_Mob_Spawn");
+        }
+        if (!suppression.isSuppressSpawnMarkers() || suppression.getRadius() < 2000.0
+                || suppression.getSuppressedGroupIds().length < 2) {
+            throw new IllegalStateException("runtime suppression settings are incomplete");
+        }
+
+        UUID suppressorId = UUID.fromString("f2187cb4-10df-365e-822a-f509f71cb500");
+        Store<EntityStore> entityStore = world.getEntityStore().getStore();
+        SpawnSuppressionController controller = entityStore.getResource(SpawnSuppressionController.getResourceType());
+        if (controller == null) {
+            throw new IllegalStateException("runtime spawn suppression controller is unavailable");
+        }
+        SpawnSuppressorEntry suppressor = controller.getSpawnSuppressorMap().get(suppressorId);
+        if (suppressor == null || !"No_Hostile_Mob_Spawn".equals(suppressor.getSuppressionId())) {
+            throw new IllegalStateException("world did not register the No_Hostile_Mob_Spawn suppressor");
+        }
+        Vector3d expectedSuppressorPosition = new Vector3d(0.0, 128.0, 0.0);
+        if (suppressor.getPosition().distance(expectedSuppressorPosition) > 0.01) {
+            throw new IllegalStateException("world registered the suppressor at an unexpected position");
+        }
+        Vector3d testPosition = new Vector3d(
+                (centerX * ChunkUtil.SIZE) + ChunkUtil.SIZE / 2.0,
+                80.0,
+                (centerZ * ChunkUtil.SIZE) + ChunkUtil.SIZE / 2.0);
+        if (testPosition.distance(suppressor.getPosition()) > suppression.getRadius()) {
+            throw new IllegalStateException("test chunks are outside the configured suppression radius");
+        }
+
+        SpawnMarker hostileProbe = SpawnMarker.getAssetMap()
+                .getAsset("NoHostileMobSpawn_Integration_Hostile_Probe");
+        SpawnMarker preservedProbe = SpawnMarker.getAssetMap()
+                .getAsset("NoHostileMobSpawn_Integration_Preserved_Probe");
+        if (hostileProbe == null || preservedProbe == null) {
+            throw new IllegalStateException("runtime did not load both suppression probe markers");
+        }
+        verifySuppressionProbe(hostileProbe, suppressedRoleSet, suppression, true);
+        verifySuppressionProbe(preservedProbe, new HashSet<>(preservedRoles), suppression, false);
+
+        int minX = (centerX - radius) * ChunkUtil.SIZE;
+        int maxX = (centerX + radius + 1) * ChunkUtil.SIZE;
+        int minZ = (centerZ - radius) * ChunkUtil.SIZE;
+        int maxZ = (centerZ + radius + 1) * ChunkUtil.SIZE;
+        int[] markerStats = new int[2];
+        entityStore.forEachChunk(
+                Query.and(SpawnMarkerEntity.getComponentType(), TransformComponent.getComponentType()),
+                (chunk, commandBuffer) -> {
+            for (int index = 0; index < chunk.size(); index++) {
+                SpawnMarkerEntity marker = chunk.getComponent(index, SpawnMarkerEntity.getComponentType());
+                if (marker == null) {
+                    continue;
+                }
+
+                TransformComponent transform = chunk.getComponent(index, TransformComponent.getComponentType());
+                if (transform == null) {
+                    continue;
+                }
+                Vector3d position = transform.getPosition();
+                if (position.x < minX || position.x >= maxX || position.z < minZ || position.z >= maxZ) {
+                    continue;
+                }
+
+                markerStats[0]++;
+                SpawnMarker markerConfig = marker.getCachedMarker();
+                if (markerConfig == null) {
+                    markerConfig = SpawnMarker.getAssetMap().getAsset(marker.getSpawnMarkerId());
+                }
+                if (markerConfig == null || markerConfig.getWeightedConfigurations() == null) {
+                    throw new IllegalStateException(
+                            "loaded spawn marker has no configuration: " + marker.getSpawnMarkerId());
+                }
+
+                markerConfig.getWeightedConfigurations().forEach(configuration -> {
+                    markerStats[1]++;
+                    String role = configuration.getNpc();
+                    if (suppressedRoleSet.contains(role)) {
+                        throw new IllegalStateException("loaded spawn marker still offers hostile role " + role
+                                + " through " + marker.getSpawnMarkerId());
+                    }
+                        });
+
+                if (marker.isSuppressedBy(suppression)
+                        && (marker.getSuppressedBy() == null || !marker.getSuppressedBy().contains(suppressorId))) {
+                    throw new IllegalStateException(
+                            "hostile spawn marker was not registered with its active suppressor");
+                }
+            }
+        });
+        getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Runtime suppression integration test passed: "
+                + suppressedRoles.size() + " hostile roles, " + preservedRoles.size()
+                + " preserved roles, " + markerStats[0] + " live spawn markers, "
+                + markerStats[1] + " live spawn options; hostile marker probe suppressed and preserved probe allowed.");
     }
 
-    private void failManualProbe(String message, Throwable throwable) {
-        if (throwable == null) {
-            getLogger().at(Level.SEVERE).log("[NoHostileMobSpawnTest] Manual spawn probe failed: " + message);
-        } else {
-            getLogger().at(Level.SEVERE).withCause(throwable)
-                    .log("[NoHostileMobSpawnTest] Manual spawn probe failed: " + message);
+    private void verifySuppressionProbe(
+            SpawnMarker markerConfig,
+            Set<String> expectedRoles,
+            SpawnSuppression suppression,
+            boolean expectSuppressed) {
+        SpawnMarkerEntity marker = new SpawnMarkerEntity();
+        marker.setSpawnMarker(markerConfig);
+        Set<String> configuredRoles = new HashSet<>();
+        markerConfig.getWeightedConfigurations().forEach(configuration -> configuredRoles.add(configuration.getNpc()));
+        boolean containsExpectedRole = expectedRoles.stream().anyMatch(configuredRoles::contains);
+        if (!containsExpectedRole) {
+            throw new IllegalStateException(
+                    "runtime probe marker does not reference an expected role: " + markerConfig.getId());
+        }
+
+        if (marker.isSuppressedBy(suppression) != expectSuppressed) {
+            throw new IllegalStateException(
+                    "runtime suppression result was incorrect for probe marker " + markerConfig.getId());
         }
     }
 
@@ -458,19 +509,6 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
 
         try {
             return Integer.parseInt(value);
-        } catch (NumberFormatException ignored) {
-            return fallback;
-        }
-    }
-
-    private static double doubleEnv(String name, double fallback) {
-        String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
-            return fallback;
-        }
-
-        try {
-            return Double.parseDouble(value);
         } catch (NumberFormatException ignored) {
             return fallback;
         }
@@ -591,6 +629,73 @@ PY
 
 "$MOD_SCRIPT_DIR/generate-suppression.py" "$runtime_dir/Assets.zip" "$work_dir/NoHostileMobSpawn" >/dev/null
 
+python3 - "$runtime_dir/Assets.zip" "$work_dir/NoHostileMobSpawn" "$MOD_SCRIPT_DIR/generate-suppression.py" <<'PY'
+import importlib.util
+import json
+import sys
+import zipfile
+from pathlib import Path
+
+sys.dont_write_bytecode = True
+assets_zip = Path(sys.argv[1])
+package_dir = Path(sys.argv[2])
+script_path = Path(sys.argv[3])
+spec = importlib.util.spec_from_file_location("generate_suppression", script_path)
+generator = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(generator)
+
+roles, groups, _, _, _, source_spawns = generator.load_json_assets(assets_zip)
+hostile_roles = generator.generated_hostile_roles(roles, groups)
+with (package_dir / generator.HOSTILE_GROUP_RELATIVE_PATH).open() as f:
+    generated_roles = json.load(f).get("IncludeRoles", [])
+if generated_roles != hostile_roles:
+    raise SystemExit("generated hostile role group differs from runtime classification")
+if "Bear_Grizzly" not in hostile_roles:
+    raise SystemExit("confirmed hostile role Bear_Grizzly is missing from the generated group")
+
+expected_spawn_documents = {
+    path: document
+    for path, document, _, _, _ in generator.filtered_spawn_documents(source_spawns, hostile_roles)
+}
+spawn_root = package_dir / "Server" / "NPC" / "Spawn"
+actual_spawn_paths = {
+    Path(path.relative_to(package_dir).as_posix())
+    for path in spawn_root.rglob("*.json")
+    if "/Suppression/" not in path.relative_to(package_dir).as_posix()
+}
+if actual_spawn_paths != set(expected_spawn_documents):
+    raise SystemExit("generated spawn override set differs from hostile-role filtering")
+for relative_path, expected_document in expected_spawn_documents.items():
+    with (package_dir / relative_path).open() as f:
+        actual_document = json.load(f)
+    if actual_document != expected_document:
+        raise SystemExit(f"{relative_path}: generated override did not preserve/filter source entries correctly")
+
+suppression_path = package_dir / generator.SUPPRESSION_RELATIVE_PATHS[0]
+with suppression_path.open() as f:
+    suppression = json.load(f)
+if (
+    suppression.get("SuppressionRadius", 0) < generator.SUPPRESSION_RADIUS
+    or not suppression.get("SuppressSpawnMarkers")
+    or not {"Aggressive", generator.HOSTILE_GROUP_NAME}.issubset(suppression.get("SuppressedGroups", []))
+):
+    raise SystemExit("generated suppression asset is missing required hostile suppression settings")
+
+with zipfile.ZipFile(assets_zip) as archive:
+    source_spawn_paths = {
+        Path(name)
+        for name in archive.namelist()
+        if name.startswith("Server/NPC/Spawn/") and name.endswith(".json")
+    }
+if not expected_spawn_documents or not source_spawn_paths:
+    raise SystemExit("runtime contains no spawn marker assets to validate")
+
+print(
+    f"Verified generated suppression assets: {len(hostile_roles)} hostile roles, "
+    f"{len(expected_spawn_documents)} exact spawn overrides."
+)
+PY
+
 python3 - "$runtime_dir/Assets.zip" "$work_dir/NoHostileMobSpawn/Reports/Mob_Drops.csv" "$preserved_group" <<'PY'
 import csv
 import json
@@ -633,6 +738,44 @@ with preserved_group.open("w") as f:
     f.write("\n")
 PY
 
+python3 - "$work_dir/NoHostileMobSpawn" "$hostile_group" "$preserved_group" <<'PY'
+import json
+import sys
+from pathlib import Path
+
+package_dir = Path(sys.argv[1])
+with Path(sys.argv[2]).open() as f:
+    hostile_roles = set(json.load(f).get("IncludeRoles", []))
+with Path(sys.argv[3]).open() as f:
+    preserved_roles = sorted(set(json.load(f).get("IncludeRoles", [])))
+if "Bear_Grizzly" not in hostile_roles:
+    raise SystemExit("confirmed hostile role Bear_Grizzly is missing from the test role list")
+preserved_probe_role = next((role for role in preserved_roles if role not in hostile_roles), None)
+if preserved_probe_role is None:
+    raise SystemExit("no preserved role is available for the runtime suppression probe")
+
+probe_dir = package_dir / "Server" / "NPC" / "Spawn" / "Markers"
+probe_dir.mkdir(parents=True, exist_ok=True)
+probe_settings = {
+    "Model": "NPC_Spawn_Marker",
+    "NPCs": [{"Weight": 1, "Name": None, "RealtimeRespawnTime": 420}],
+    "ExclusionRadius": 20,
+    "RealtimeRespawn": True,
+    "MaxDropHeight": 4,
+    "DeactivationDistance": 150,
+}
+for marker_name, role_name in (
+    ("NoHostileMobSpawn_Integration_Hostile_Probe", "Bear_Grizzly"),
+    ("NoHostileMobSpawn_Integration_Preserved_Probe", preserved_probe_role),
+):
+    document = dict(probe_settings)
+    document["NPCs"] = [{"Weight": 1, "Name": role_name, "RealtimeRespawnTime": 420}]
+    with (probe_dir / f"{marker_name}.json").open("w") as f:
+        json.dump(document, f, indent=2)
+        f.write("\n")
+print(f"Created runtime suppression probes for Bear_Grizzly and {preserved_probe_role}.")
+PY
+
 rsync -a \
   --exclude 'package.json' \
   "$work_dir/NoHostileMobSpawn/" "$server_dir/mods/NoHostileMobSpawn/"
@@ -670,6 +813,11 @@ with manifest_json.open("w") as f:
     f.write("\n")
 PY
 
+mkdir -p "$server_dir/universe/worlds/default/resources"
+cp \
+  "$work_dir/NoHostileMobSpawn/Server/Instances/Defaults/Default/resources/SpawnSuppressionController.json" \
+  "$server_dir/universe/worlds/default/resources/SpawnSuppressionController.json"
+
 build_chunk_loader_plugin
 
 mkfifo "$command_fifo"
@@ -683,10 +831,6 @@ fifo_keepalive_pid="$!"
   export NO_HOSTILE_TEST_CHUNK_RADIUS="$chunk_radius"
   export NO_HOSTILE_TEST_ROLES_FILE="$hostile_group"
   export NO_HOSTILE_TEST_PRESERVED_ROLES_FILE="$preserved_group"
-  export NO_HOSTILE_TEST_SPAWN_X="$spawn_x"
-  export NO_HOSTILE_TEST_SPAWN_Y="$spawn_y"
-  export NO_HOSTILE_TEST_SPAWN_Z="$spawn_z"
-  export NO_HOSTILE_TEST_POSITION_TOLERANCE="$position_tolerance"
   exec "$JAVA_CMD" "@../jvm.options" -jar HytaleServer.jar \
     --assets "$runtime_dir/Assets.zip" \
     --auth-mode offline \
@@ -702,7 +846,6 @@ echo "Runtime: $work_dir"
 echo "Seed: $seed"
 echo "Bind: $bind_address"
 echo "Force-loaded chunks: center ${center_chunk_x},${center_chunk_z} radius ${chunk_radius}"
-echo "Manual spawn coordinate: ${spawn_x},${spawn_y},${spawn_z}"
 
 if ! wait_for_log "Hytale Server Booted" "$ready_seconds"; then
   tail -n 80 "$server_log" >&2 || true
@@ -714,14 +857,14 @@ if ! wait_for_log "\\[NoHostileMobSpawnTest\\] Force-loaded" "$force_load_second
   fail "test chunk loader did not force-load chunks within ${force_load_seconds}s"
 fi
 
-if ! wait_for_log "\\[NoHostileMobSpawnTest\\] Manual spawn probe (passed|failed)" "$ready_seconds"; then
+if ! wait_for_log "\\[NoHostileMobSpawnTest\\] Runtime suppression integration test" "$ready_seconds"; then
   tail -n 120 "$server_log" >&2 || true
-  fail "manual spawn probe did not complete within ${ready_seconds}s"
+  fail "runtime suppression test did not complete within ${ready_seconds}s"
 fi
 
-if rg -q "\\[NoHostileMobSpawnTest\\] Manual spawn probe failed" "$server_log"; then
+if rg -q "\\[NoHostileMobSpawnTest\\] Runtime suppression integration test failed" "$server_log"; then
   tail -n 120 "$server_log" >&2 || true
-  fail "manual spawn probe failed"
+  fail "runtime suppression test failed"
 fi
 
-echo "NoHostileMobSpawn manual spawn integration test passed."
+echo "NoHostileMobSpawn suppression integration test passed."
