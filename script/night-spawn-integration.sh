@@ -255,63 +255,67 @@ public final class TestChunkLoaderPlugin extends JavaPlugin {
         int centerX = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_X", 33);
         int centerZ = intEnv("NO_HOSTILE_TEST_CENTER_CHUNK_Z", 8);
         int radius = Math.max(0, intEnv("NO_HOSTILE_TEST_CHUNK_RADIUS", 4));
-        List<CompletableFuture<Ref<ChunkStore>>> futures = new ArrayList<>();
-        List<Long> chunkIndices = new ArrayList<>();
+        ChunkStore chunksStore = world.getChunkStore();
+        Store<ChunkStore> store = chunksStore.getStore();
+        List<CompletableFuture<WorldChunk>> retainedFutures = new ArrayList<>();
+        int chunkCount = 0;
 
         for (int x = centerX - radius; x <= centerX + radius; x++) {
             for (int z = centerZ - radius; z <= centerZ + radius; z++) {
                 long index = ChunkUtil.indexChunk(x, z);
-                chunkIndices.add(index);
-                futures.add(world.getChunkStore().getChunkReferenceAsync(index));
+                chunkCount++;
+                CompletableFuture<Ref<ChunkStore>> loadFuture = chunksStore.getChunkReferenceAsync(index);
+                retainedFutures.add(loadFuture.thenCompose(reference -> {
+                    CompletableFuture<WorldChunk> retainedFuture = new CompletableFuture<>();
+                    Runnable retainChunk = () -> {
+                        try {
+                            if (reference == null || !reference.isValid()) {
+                                throw new IllegalStateException(
+                                        "loaded chunk reference is no longer valid: "
+                                                + ChunkUtil.xOfChunkIndex(index) + ","
+                                                + ChunkUtil.zOfChunkIndex(index));
+                            }
+                            WorldChunk chunk = store.getComponent(reference, WorldChunk.getComponentType());
+                            if (chunk == null) {
+                                throw new IllegalStateException(
+                                        "loaded chunk is no longer available: "
+                                                + ChunkUtil.xOfChunkIndex(index) + ","
+                                                + ChunkUtil.zOfChunkIndex(index));
+                            }
+                            chunk.addKeepLoaded();
+                            retainedFuture.complete(chunk);
+                        } catch (RuntimeException exception) {
+                            retainedFuture.completeExceptionally(exception);
+                        }
+                    };
+
+                    if (world.isInThread()) {
+                        retainChunk.run();
+                    } else {
+                        world.execute(retainChunk);
+                    }
+                    return retainedFuture;
+                }));
             }
         }
 
+        int totalChunkCount = chunkCount;
         CompletableFuture
-                .allOf(futures.toArray(CompletableFuture[]::new))
-                .thenRun(() -> world.execute(() -> {
-                    try {
-                        ChunkStore chunksStore = world.getChunkStore();
-                        Store<ChunkStore> store = world.getChunkStore().getStore();
-                        List<WorldChunk> chunks = new ArrayList<>();
-                        for (long index : chunkIndices) {
-                            WorldChunk chunk = chunksStore.getChunkComponent(index, WorldChunk.getComponentType());
-                            if (chunk == null) {
-                                throw new IllegalStateException(
-                                        "loaded chunk is no longer available: " + ChunkUtil.xOfChunkIndex(index)
-                                                + "," + ChunkUtil.zOfChunkIndex(index));
-                            }
-                            chunks.add(chunk);
-                        }
-
-                        keepLoadedAndTicking(world, store, centerX, centerZ, radius, chunks);
-                        runManualSpawnProbe(world);
-                    } catch (Exception exception) {
-                        getLogger().at(Level.SEVERE).withCause(exception)
-                                .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
+                .allOf(retainedFutures.toArray(CompletableFuture[]::new))
+                .thenRunAsync(() -> {
+                    for (CompletableFuture<WorldChunk> retainedFuture : retainedFutures) {
+                        forceBlockTicks(store, retainedFuture.join());
                     }
-                }))
+                    getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Force-loaded " + totalChunkCount
+                            + " chunks around " + centerX + "," + centerZ
+                            + " radius " + radius + " in world " + world.getName() + ".");
+                    runManualSpawnProbe(world);
+                }, world)
                 .exceptionally(throwable -> {
                     getLogger().at(Level.SEVERE).withCause(throwable)
                             .log("[NoHostileMobSpawnTest] Failed to force-load chunks.");
                     return null;
                 });
-    }
-
-    private void keepLoadedAndTicking(
-            World world,
-            Store<ChunkStore> store,
-            int centerX,
-            int centerZ,
-            int radius,
-            List<WorldChunk> chunks) {
-        for (WorldChunk chunk : chunks) {
-            chunk.addKeepLoaded();
-            forceBlockTicks(store, chunk);
-        }
-
-        getLogger().at(Level.INFO).log("[NoHostileMobSpawnTest] Force-loaded " + chunks.size()
-                + " chunks around " + centerX + "," + centerZ
-                + " radius " + radius + " in world " + world.getName() + ".");
     }
 
     private void runManualSpawnProbe(World world) {
